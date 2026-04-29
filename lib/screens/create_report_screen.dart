@@ -4,32 +4,32 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/report.dart';
 import '../providers/report_provider.dart';
 import '../services/location_service.dart';
 import '../services/media_service.dart';
 
 const List<String> PUNJAB_CITIES = [
-  "Lahore",
-  "Faisalabad",
-  "Rawalpindi",
-  "Gujranwala",
-  "Multan",
   "Bahawalpur",
-  "Sargodha",
-  "Sialkot",
-  "Sheikhupura",
-  "Rahim Yar Khan",
-  "Jhang",
-  "Dera Ghazi Khan",
-  "Gujrat",
-  "Sahiwal",
-  "Wah Cantt",
-  "Taxila",
-  "Mianwali",
-  "Kasur",
-  "Bhakkar",
-  "Okara",
+"Bhakkar",
+"Dera Ghazi Khan",
+"Faisalabad",
+"Gujranwala",
+"Jhang",
+"Kasur",
+"Lahore",
+"Mianwali",
+"Multan",
+"Okara",
+"Rahim Yar Khan",
+"Rawalpindi",
+"Sahiwal",
+"Sargodha",
+"Sheikhupura",
+"Sialkot",
+"Taxila",
+"Wah Cantt"
 ];
 
 class _Cat {
@@ -56,7 +56,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   final _landmarkCtrl = TextEditingController();
 
   final List<String> _imagePaths = [];
-  String? _videoPath;
+  // videos removed: only images allowed
 
   double? _latitude;
   double? _longitude;
@@ -124,21 +124,122 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
               const Text('Add Evidence',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               const SizedBox(height: 16),
-              _mediaOption(Icons.camera_alt_rounded, 'Take Photo',
-                  () => _pick(ImageSource.camera, false)),
-              _mediaOption(Icons.videocam_rounded, 'Record Video',
-                  () => _pick(ImageSource.camera, true)),
-              _mediaOption(Icons.photo_library_rounded,
-                  'Choose Images from Gallery', () => _pickMultipleImages()),
-              _mediaOption(
-                  Icons.video_library_rounded,
-                  'Choose Video from Gallery',
-                  () => _pick(ImageSource.gallery, true)),
+              _mediaOption(Icons.camera_alt_rounded, 'Take Photo', () async {
+                Navigator.pop(context);
+                final ok = await _ensureCameraPermission();
+                if (!ok) {
+                  _showSnack('Camera permission denied.');
+                  return;
+                }
+                await _pick(ImageSource.camera, closeModal: false);
+              }),
+              _mediaOption(Icons.photo_library_rounded, 'Choose Images from Gallery', () async {
+                Navigator.pop(context);
+                final ok = await _ensureGalleryPermission();
+                if (!ok) {
+                  _showSnack('Gallery permission denied.');
+                  return;
+                }
+                await _pickMultipleImages(closeModal: false);
+              }),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<bool> _ensureCameraPermission() async {
+    final status = await Permission.camera.status;
+    if (status.isGranted) return true;
+
+    final proceed = await _showPermissionRationale(
+        'Camera Permission', 'The app needs camera access to take photos.');
+    if (!proceed) return false;
+
+    final res = await Permission.camera.request();
+    if (res.isGranted) return true;
+
+    if (res.isPermanentlyDenied) {
+      await _showOpenSettingsDialog(
+          'Camera Permission', 'Camera permission is permanently denied. Open settings to enable it.');
+    }
+    return false;
+  }
+
+  Future<bool> _ensureGalleryPermission() async {
+    if (Platform.isAndroid) {
+      final storageStatus = await Permission.storage.status;
+      final photosStatus = await Permission.photos.status;
+      if (storageStatus.isGranted || photosStatus.isGranted) return true;
+
+      final proceed = await _showPermissionRationale(
+          'Storage Permission', 'The app needs storage access to select photos from your gallery.');
+      if (!proceed) return false;
+
+      // Try requesting storage first (older Android), then photos (Android 13+)
+      final resStorage = await Permission.storage.request();
+      if (resStorage.isGranted) return true;
+
+      final resPhotos = await Permission.photos.request();
+      if (resPhotos.isGranted) return true;
+
+      if (resStorage.isPermanentlyDenied || resPhotos.isPermanentlyDenied) {
+        await _showOpenSettingsDialog('Storage Permission',
+            'Storage permission is permanently denied. Open settings to enable it.');
+      }
+      return false;
+    } else {
+      final status = await Permission.photos.status;
+      if (status.isGranted) return true;
+
+      final proceed = await _showPermissionRationale(
+          'Photos Permission', 'The app needs Photos access to select images from your gallery.');
+      if (!proceed) return false;
+
+      final res = await Permission.photos.request();
+      if (res.isGranted) return true;
+      if (res.isPermanentlyDenied) {
+        await _showOpenSettingsDialog('Photos Permission',
+            'Photos permission is permanently denied. Open settings to enable it.');
+      }
+      return false;
+    }
+  }
+
+  Future<bool> _showPermissionRationale(String title, String message) async {
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Proceed')),
+        ],
+      ),
+    );
+    return res == true;
+  }
+
+  Future<bool> _showOpenSettingsDialog(String title, String message) async {
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () async {
+                Navigator.pop(context, true);
+                await openAppSettings();
+              },
+              child: const Text('Open Settings')),
+        ],
+      ),
+    );
+    return res == true;
   }
 
   Future<void> _pickMultipleImages({bool closeModal = true}) async {
@@ -161,7 +262,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         setState(() {
           final remaining = 4 - _imagePaths.length;
           _imagePaths.addAll(picked.take(remaining));
-          _videoPath = null;
           _invalidFields.remove('media');
           if (_invalidFields.isEmpty) _topErrorMsg = null;
         });
@@ -170,37 +270,22 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       _showSnack('Could not access gallery: $e');
     }
   }
-
-  Future<void> _pick(ImageSource source, bool video) async {
-    Navigator.pop(context);
+  Future<void> _pick(ImageSource source, {bool closeModal = true}) async {
+    if (closeModal) Navigator.pop(context);
     try {
-      final result = video
-          ? await MediaService.pickVideo(source: source)
-          : await MediaService.pickImage(source: source);
+      final result = await MediaService.pickImage(source: source);
       if (result != null) {
+        final f = File(result.path);
+        if (f.existsSync() && f.lengthSync() > 5 * 1024 * 1024) {
+          _showSnack('Image must be <= 5MB.', fields: ['media']);
+          return;
+        }
+        if (_imagePaths.length >= 4) {
+          _showSnack('You can attach up to 4 images only.', fields: ['media']);
+          return;
+        }
         setState(() {
-          if (result.isVideo) {
-            final f = File(result.path);
-            if (f.existsSync() && f.lengthSync() > 100 * 1024 * 1024) {
-              _showSnack('Video must be <= 100MB.', fields: ['media']);
-              return;
-            }
-            _videoPath = result.path;
-            _imagePaths.clear();
-          } else {
-            final f = File(result.path);
-            if (f.existsSync() && f.lengthSync() > 5 * 1024 * 1024) {
-              _showSnack('Image must be <= 5MB.', fields: ['media']);
-              return;
-            }
-            if (_imagePaths.length >= 4) {
-              _showSnack('You can attach up to 4 images only.',
-                  fields: ['media']);
-              return;
-            }
-            _imagePaths.add(result.path);
-            _videoPath = null;
-          }
+          _imagePaths.add(result.path);
           _invalidFields.remove('media');
           if (_invalidFields.isEmpty) _topErrorMsg = null;
         });
@@ -245,7 +330,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         }
         if (area.isNotEmpty) _areaCtrl.text = area;
         if (city.isNotEmpty) _cityCtrl.text = city;
-        _invalidFields.removeAll(['address1', 'street', 'area', 'city']);
+        _invalidFields.removeAll(['address1', 'area', 'city']);
         if (_invalidFields.isEmpty) _topErrorMsg = null;
         _locating = false;
       });
@@ -263,58 +348,54 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       _showSnack('Please select an issue category.', fields: ['category']);
       return;
     }
-    // media validation: require either 2-5 images or exactly 1 video
-    if ((_videoPath == null) && _imagePaths.isEmpty) {
-      _showSnack('Please add a photo or video as evidence.', fields: ['media']);
+    // media validation: require 2-4 images
+    if (_imagePaths.isEmpty) {
+      _showSnack('Please add images as evidence.', fields: ['media']);
       return;
     }
-    if (_videoPath != null && _imagePaths.isNotEmpty) {
-      _showSnack('Please attach either images or a video, not both.',
-          fields: ['media']);
+    if (_imagePaths.length < 2) {
+      _showSnack('Please attach at least 2 images.', fields: ['media']);
       return;
     }
-    if (_imagePaths.isNotEmpty) {
-      if (_imagePaths.length < 2) {
-        _showSnack('Please attach at least 2 images.', fields: ['media']);
+    if (_imagePaths.length > 4) {
+      _showSnack('You can attach up to 4 images only.', fields: ['media']);
+      return;
+    }
+    for (final p in _imagePaths) {
+      final f = File(p);
+      if (f.existsSync() && f.lengthSync() > 5 * 1024 * 1024) {
+        _showSnack('Each image must be <= 5MB.', fields: ['media']);
         return;
       }
-      if (_imagePaths.length > 5) {
-        _showSnack('You can attach up to 5 images only.', fields: ['media']);
-        return;
-      }
-      for (final p in _imagePaths) {
-        final f = File(p);
-        if (f.existsSync() && f.lengthSync() > 5 * 1024 * 1024) {
-          _showSnack('Each image must be <= 5MB.', fields: ['media']);
+    }
+        // Address validation: require geo location to be fetched AND street/area/city filled
+        final autoFetched = _address1Ctrl.text.trim().isNotEmpty;
+        if (!autoFetched) {
+          _invalidFields.add('address1');
+          setState(() {});
+          _showSnack('Please fetch location using the Geo Location button.',
+              fields: ['address1']);
           return;
         }
-      }
-    }
-    if (_videoPath != null) {
-      final f = File(_videoPath!);
-      if (f.existsSync() && f.lengthSync() > 100 * 1024 * 1024) {
-        _showSnack('Video must be <= 100MB.', fields: ['media']);
-        return;
-      }
-    }
-    // Address validation: user must use either auto-fetch OR manual inputs (street+area+city)
-    final autoFetched = _address1Ctrl.text.trim().isNotEmpty;
-    if (!autoFetched) {
-      // require manual fields
-      if (_streetCtrl.text.trim().isEmpty) {
-        _showSnack('Please provide Street Address or use auto-fetch.',
-            fields: ['street']);
-        return;
-      }
-      if (_areaCtrl.text.trim().isEmpty) {
-        _showSnack('Please provide Area.', fields: ['area']);
-        return;
-      }
-      if (_cityCtrl.text.trim().isEmpty) {
-        _showSnack('Please provide City.', fields: ['city']);
-        return;
-      }
-    }
+
+        if (_streetCtrl.text.trim().isEmpty) {
+          _invalidFields.add('street');
+          setState(() {});
+          _showSnack('Please provide Street Address.', fields: ['street']);
+          return;
+        }
+        if (_areaCtrl.text.trim().isEmpty) {
+          _invalidFields.add('area');
+          setState(() {});
+          _showSnack('Please provide Area.', fields: ['area']);
+          return;
+        }
+        if (_cityCtrl.text.trim().isEmpty) {
+          _invalidFields.add('city');
+          setState(() {});
+          _showSnack('Please provide City.', fields: ['city']);
+          return;
+        }
 
     setState(() => _isSubmitting = true);
 
@@ -345,10 +426,9 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       description: _descriptionCtrl.text.trim().isEmpty
           ? null
           : _descriptionCtrl.text.trim(),
-      // For now we save the primary media path (first image or video) to the model
-      mediaPath:
-          _videoPath ?? (_imagePaths.isNotEmpty ? _imagePaths.first : null),
-      isVideo: _videoPath != null,
+        // For now we save the primary media path (first image) to the model
+        mediaPath: _imagePaths.isNotEmpty ? _imagePaths.first : null,
+        isVideo: false,
       updates: [
         ReportUpdate(
           message: 'Report received and queued for AI verification.',
@@ -589,19 +669,11 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                   duration: const Duration(milliseconds: 300),
                   height: 180,
                   decoration: BoxDecoration(
-                    color: (_videoPath != null || _imagePaths.isNotEmpty)
-                        ? const Color(0xFF1565C0).withOpacity(0.06)
-                        : Colors.white,
+                    color: _imagePaths.isNotEmpty ? const Color(0xFF1565C0).withOpacity(0.06) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: (_videoPath != null || _imagePaths.isNotEmpty)
-                          ? const Color(0xFF1565C0).withOpacity(0.4)
-                          : _invalidFields.contains('media')
-                              ? const Color(0xFFB71C1C)
-                              : const Color(0xFFE0E0E0),
-                      width: (_videoPath != null || _imagePaths.isNotEmpty)
-                          ? 2
-                          : 1.5,
+                      color: _imagePaths.isNotEmpty ? const Color(0xFF1565C0).withOpacity(0.4) : (_invalidFields.contains('media') ? const Color(0xFFB71C1C) : const Color(0xFFE0E0E0)),
+                      width: _imagePaths.isNotEmpty ? 2 : 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -610,9 +682,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           offset: const Offset(0, 2)),
                     ],
                   ),
-                  child: (_videoPath != null || _imagePaths.isNotEmpty)
-                      ? _mediaPreview()
-                      : _mediaPlaceholder(),
+                  child: _imagePaths.isNotEmpty ? _mediaPreview() : _mediaPlaceholder(),
                 ),
               ),
 
@@ -732,8 +802,9 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                             controller: _address1Ctrl,
                             readOnly: true,
                             decoration: InputDecoration(
-                              labelText: 'Auto Fetch',
-                              hintText: 'Press button to fetch location.',
+                              labelText: 'Geo Location',
+                              hintText: 'Click the GPS icon',
+                              errorText: _invalidFields.contains('address1') ? 'Required' : null,
                               border: const OutlineInputBorder(),
                               isDense: true,
                               enabledBorder: OutlineInputBorder(
@@ -773,17 +844,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    // Or between auto fetch and manual input
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: Text('Or',
-                            style: TextStyle(
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500)),
-                      ),
-                    ),
                     // Manual inputs
                     TextField(
                       controller: _streetCtrl,
@@ -798,6 +858,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                       decoration: InputDecoration(
                         labelText: 'Street Address *',
                         hintText: 'Street name, building number',
+                        errorText: _invalidFields.contains('street') ? 'Required' : null,
                         border: const OutlineInputBorder(),
                         isDense: true,
                         enabledBorder: OutlineInputBorder(
@@ -833,6 +894,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                             decoration: InputDecoration(
                               labelText: 'Area *',
                               hintText: 'Neighborhood / area',
+                              errorText: _invalidFields.contains('area') ? 'Required' : null,
                               border: const OutlineInputBorder(),
                               isDense: true,
                               enabledBorder: OutlineInputBorder(
@@ -859,6 +921,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                             decoration: InputDecoration(
                               labelText: 'City *',
                               hintText: 'City',
+                              errorText: _invalidFields.contains('city') ? 'Required' : null,
                               border: const OutlineInputBorder(),
                               isDense: true,
                               suffixIcon: const Icon(Icons.search),
@@ -1009,64 +1072,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   }
 
   Widget _mediaPreview() {
-    // If a video is present, show the video placeholder full-bleed
-    if (_videoPath != null) {
-      return Stack(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              color: const Color(0xFF263238),
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.play_circle_fill_rounded,
-                        color: Colors.white, size: 48),
-                    SizedBox(height: 8),
-                    Text('Video selected',
-                        style: TextStyle(color: Colors.white70, fontSize: 13)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 10,
-            right: 10,
-            child: GestureDetector(
-              onTap: () => setState(() {
-                _videoPath = null;
-              }),
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
-                    shape: BoxShape.circle),
-                child: const Icon(Icons.close_rounded,
-                    color: Colors.white, size: 16),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 10,
-            left: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xFF43A047),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text('✓  Video added',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
-            ),
-          ),
-        ],
-      );
-    }
+    // Images grid preview (up to 4 images)
 
     // Otherwise show a 2x2 grid for up to 4 images sized to available space
     return LayoutBuilder(builder: (context, constraints) {
@@ -1130,8 +1136,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           // empty slot: show add button
           return GestureDetector(
             onTap: () async {
-              // pick images to fill remaining slots
-              await _pickMultipleImages(closeModal: false);
+              // show media choice sheet so user can pick camera or gallery each time
+              _showMediaPicker();
             },
             child: Container(
               decoration: BoxDecoration(
@@ -1174,7 +1180,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
               color: Color(0xFF1565C0), size: 28),
         ),
         const SizedBox(height: 12),
-        const Text('Add Photo / Video',
+        const Text('Add Photo',
             style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -1187,12 +1193,26 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             GestureDetector(
-                onTap: () => _pick(ImageSource.camera, false),
+                onTap: () async {
+                  final ok = await _ensureCameraPermission();
+                  if (!ok) {
+                    _showSnack('Camera permission denied.');
+                    return;
+                  }
+                  await _pick(ImageSource.camera, closeModal: false);
+                },
                 child: _mediaBtn(Icons.camera_alt_outlined, 'Camera')),
             const SizedBox(width: 12),
             GestureDetector(
-                onTap: () => _pick(ImageSource.camera, true),
-                child: _mediaBtn(Icons.videocam_outlined, 'Video')),
+                onTap: () async {
+                  final ok = await _ensureGalleryPermission();
+                  if (!ok) {
+                    _showSnack('Gallery permission denied.');
+                    return;
+                  }
+                  await _pickMultipleImages(closeModal: false);
+                },
+                child: _mediaBtn(Icons.photo_library_outlined, 'Gallery')),
           ],
         ),
       ],

@@ -50,13 +50,12 @@ class LocationService {
       final parts = await reverseGeocodeParts(position.latitude, position.longitude);
       final area = parts['subLocality'] ?? '';
       final loc = parts['locality'] ?? '';
-      if (area.isNotEmpty && loc.isNotEmpty) {
-        address = '$area, $loc';
-      } else if (loc.isNotEmpty) {
-        address = loc;
-      } else if (area.isNotEmpty) {
-        address = area;
-      }
+      final plus = parts['plusCode'] ?? '';
+      final addrParts = <String>[];
+      if (plus.isNotEmpty) addrParts.add(plus);
+      if (area.isNotEmpty) addrParts.add(area);
+      if (loc.isNotEmpty) addrParts.add(loc);
+      if (addrParts.isNotEmpty) address = addrParts.join(', ');
     } catch (_) {
       // keep coordinates on failure
     }
@@ -75,10 +74,13 @@ class LocationService {
       final parts = await reverseGeocodeParts(latitude, longitude);
       final area = parts['subLocality'] ?? '';
       final loc = parts['locality'] ?? '';
-      if (area.isEmpty && loc.isEmpty) return '';
-      if (area.isEmpty) return loc;
-      if (loc.isEmpty) return area;
-      return '$area, $loc';
+      final plus = parts['plusCode'] ?? '';
+      final addrParts = <String>[];
+      if (plus.isNotEmpty) addrParts.add(plus);
+      if (area.isNotEmpty) addrParts.add(area);
+      if (loc.isNotEmpty) addrParts.add(loc);
+      if (addrParts.isEmpty) return '';
+      return addrParts.join(', ');
     } catch (_) {
       return '';
     }
@@ -104,6 +106,25 @@ class LocationService {
         return filtered.join(', ').trim();
       }
 
+      String extractPlus(String? s) {
+        if (s == null) return '';
+        final tokens = s.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+        for (final t in tokens) {
+          if (t.contains('+')) return t;
+        }
+        return '';
+      }
+
+      // try to find a plus-code token from multiple placemark fields
+      String plus = '';
+      for (final field in [p.name, p.subLocality, p.thoroughfare, p.street, p.locality, p.postalCode]) {
+        final found = extractPlus(field);
+        if (found.isNotEmpty) {
+          plus = found;
+          break;
+        }
+      }
+
       final rawSub = takeSafe(p.subLocality);
       final rawThorough = takeSafe(p.thoroughfare);
       final rawStreet = takeSafe(p.street);
@@ -121,6 +142,7 @@ class LocationService {
       result['street'] = street;
       result['subLocality'] = sub;
       result['locality'] = rawLocal;
+      result['plusCode'] = plus;
       return result;
     } catch (_) {
       return result;

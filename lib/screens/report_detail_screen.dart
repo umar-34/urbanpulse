@@ -94,22 +94,49 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                           .deleteReport(report.id);
                       if (context.mounted) Navigator.pop(context);
                     }
+                  } else if (v == 'delete_disabled') {
+                    // Inform user why delete is disabled
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text(
+                          'Reports currently being processed by the municipality cannot be retracted for logistical reasons'),
+                    ));
                   }
                 },
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_outline_rounded,
-                            color: Color(0xFFE53935), size: 18),
-                        SizedBox(width: 8),
-                        Text('Delete Report',
-                            style: TextStyle(color: Color(0xFFE53935))),
-                      ],
-                    ),
-                  ),
-                ],
+                itemBuilder: (_) {
+                  // Allow delete only for Received (pending) and AI Verified
+                  final canDelete = report.status == ReportStatus.received || report.status == ReportStatus.aiVerified;
+                  if (canDelete) {
+                    return [
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline_rounded,
+                                color: Color(0xFFE53935), size: 18),
+                            SizedBox(width: 8),
+                            Text('Delete Report',
+                                style: TextStyle(color: Color(0xFFE53935))),
+                          ],
+                        ),
+                      ),
+                    ];
+                  } else {
+                    // show a visually disabled item but keep it selectable to show an explanatory SnackBar
+                    return [
+                      PopupMenuItem(
+                        value: 'delete_disabled',
+                        child: Row(
+                          children: const [
+                            Icon(Icons.lock_outline_rounded,
+                                color: Color(0xFF9E9E9E), size: 18),
+                            SizedBox(width: 8),
+                            Text('Delete Report', style: TextStyle(color: Color(0xFF9E9E9E))),
+                          ],
+                        ),
+                      ),
+                    ];
+                  }
+                },
               ),
             ],
             backgroundColor: Colors.white,

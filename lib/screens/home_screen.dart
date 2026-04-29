@@ -341,7 +341,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _quickCard(BuildContext context, String label, IconData icon, String arg) {
-    final tint = const Color(0xFF1565C0).withOpacity(0.08);
+    // color mapping per quick action
+    Color iconColor = const Color(0xFF1565C0); // default (Pothole)
+    switch (arg) {
+      case 'garbage':
+        iconColor = const Color(0xFFD32F2F); // muted red / grey-reddish
+        break;
+      case 'brokenStreetlight':
+        iconColor = const Color(0xFFFFD54F); // yellow for streetlight
+        break;
+      case 'waterLeak':
+        iconColor = const Color.fromARGB(255, 2, 209, 192); // sea blue for water
+        break;
+      default:
+        iconColor = const Color(0xFF1565C0);
+    }
+    final tint = iconColor.withOpacity(0.08);
     return InkWell(
       onTap: () => Navigator.pushNamed(context, '/create-report', arguments: arg),
       borderRadius: BorderRadius.circular(12),
@@ -367,7 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              child: Icon(icon, color: const Color(0xFF1565C0), size: 24),
+              child: Icon(icon, color: iconColor, size: 24),
             ),
             const SizedBox(height: 10),
             Text(label,
