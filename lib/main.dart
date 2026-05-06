@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'providers/report_provider.dart';
 import 'screens/splash_screen.dart';
+import 'screens/auth/welcome_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/create_report_screen.dart';
 import 'screens/report_detail_screen.dart';
@@ -10,8 +12,9 @@ import 'screens/my_reports_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/all_reports_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -67,11 +70,12 @@ class UrbanPulseApp extends StatelessWidget {
           ),
         ),
       ),
-      initialRoute: '/splash',
+      home: const WelcomeScreen(),
       routes: {
         '/splash': (_) => const SplashScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/home': (_) => const MainNavigation(),
+        '/main': (_) => const MainNavigation(),
         '/create-report': (_) => const CreateReportScreen(),
         '/report-detail': (_) => const ReportDetailScreen(),
         '/all-reports': (_) => const AllReportsScreen(),

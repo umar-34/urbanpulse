@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/report_provider.dart';
 import 'create_report_screen.dart';
+import 'auth/welcome_screen.dart';
 import '../services/location_service.dart';
 import '../services/media_service.dart';
 
@@ -241,14 +244,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Logged out successfully'),
-                  backgroundColor: const Color(0xFF1565C0),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                (route) => false,
               );
             },
             child: const Text('Log Out',
@@ -318,7 +317,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: EdgeInsets.only(
               left: 16, right: 16, top: 12, bottom: media.viewInsets.bottom + 12),
           child: StatefulBuilder(builder: (context, setState) {
-            Future<void> _fetchLocation() async {
+            Future<void> fetchLocation() async {
               setState(() {
                 _locating = true;
                 _locationError = null;
@@ -688,25 +687,67 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    Text(_name,
-                        style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF1A1A2E))),
-                    const SizedBox(height: 4),
-                    Text(_email,
-                      style: const TextStyle(
-                        fontSize: 13, color: Color(0xFF9E9E9E))),
-                    if (_phone.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(_phone,
-                          style: const TextStyle(fontSize: 13, color: Color(0xFF616161))),
-                    ],
-                    if (_profileLocationLabel.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(_profileLocationLabel,
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF616161))),
-                    ],
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseAuth.instance.currentUser == null
+                          ? const Stream.empty()
+                          : FirebaseFirestore.instance.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).snapshots(),
+                      builder: (context, snap) {
+                        if (snap.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        if (!snap.hasData || !(snap.data?.exists ?? false)) {
+                          // fallback to local values
+                          return Column(
+                            children: [
+                              Text(_name,
+                                  style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF1A1A2E))),
+                              const SizedBox(height: 4),
+                              Text(_email, style: const TextStyle(fontSize: 13, color: Color(0xFF9E9E9E))),
+                              if (_phone.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(_phone, style: const TextStyle(fontSize: 13, color: Color(0xFF616161))),
+                              ],
+                              if (_profileLocationLabel.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(_profileLocationLabel, style: const TextStyle(fontSize: 13, color: Color(0xFF616161))),
+                              ],
+                            ],
+                          );
+                        }
+
+                        final data = snap.data!.data()!;
+                        final first = (data['firstName'] ?? '').toString().trim();
+                        final last = (data['lastName'] ?? '').toString().trim();
+                        final email = (data['email'] ?? FirebaseAuth.instance.currentUser?.email ?? '').toString();
+                        final phone = (data['phoneNumber'] ?? '').toString();
+                        final city = (data['city'] ?? '').toString();
+
+                        final displayName = ((first + ' ' + last).trim().isNotEmpty) ? (first + ' ' + last).trim() : email;
+
+                        return Column(
+                          children: [
+                            Text(displayName,
+                                style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF1A1A2E))),
+                            const SizedBox(height: 4),
+                            Text(email, style: const TextStyle(fontSize: 13, color: Color(0xFF9E9E9E))),
+                            if (phone.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(phone, style: const TextStyle(fontSize: 13, color: Color(0xFF616161))),
+                            ],
+                            if (city.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(city, style: const TextStyle(fontSize: 13, color: Color(0xFF616161))),
+                            ],
+                          ],
+                        );
+                      },
+                    ),
                     const SizedBox(height: 20),
                     // Live stats
                     Row(

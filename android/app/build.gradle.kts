@@ -1,12 +1,14 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // The Flutter Gradle Plugin
     id("dev.flutter.flutter-gradle-plugin")
+    // For Firebase
+    id("com.google.gms.google-services")
 }
 
 android {
-    namespace = "com.example.urbanpulse"
+    namespace = "com.urbanpulse.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +23,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.urbanpulse"
+        applicationId = "com.urbanpulse.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -37,6 +39,23 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
+    
+    // 1. Authentication (For Sign-in/Sign-up)
+    implementation("com.google.firebase:firebase-auth")
+
+    // 2. Cloud Storage (For uploading report images)
+    implementation("com.google.firebase:firebase-storage")
+
+    // 3. Cloud Messaging (For Live Notifications/Status Updates)
+    implementation("com.google.firebase:firebase-messaging")
+
+    // Add the SDK for Google Analytics
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-analytics")
 }
 
 flutter {

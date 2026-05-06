@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 // Quick report grid will be shown inline below
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
@@ -16,11 +18,42 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _hasNotifications = true;
   String headerLocation = 'Locating...';
+  String? _displayName;
+  String? _email;
 
   @override
   void initState() {
     super.initState();
     fetchHeaderLocation();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() {
+          _displayName = null;
+          _email = null;
+        });
+        return;
+      }
+      _email = user.email;
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        final data = doc.data();
+        final first = (data?['firstName'] ?? '').toString().trim();
+        final last = (data?['lastName'] ?? '').toString().trim();
+        if (first.isNotEmpty || last.isNotEmpty) {
+          setState(() => _displayName = ('$first $last').trim());
+          return;
+        }
+      }
+      setState(() => _displayName = _email ?? 'Guest');
+    } catch (e) {
+      // ignore errors and fallback to defaults
+      setState(() => _displayName = _email ?? 'Guest');
+    }
   }
 
   Future<void> fetchHeaderLocation() async {
@@ -87,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 snap: true,
                 elevation: 0,
                 titleSpacing: 0,
+                automaticallyImplyLeading: false,
                 // increase toolbar height so header content has breathing room
                 toolbarHeight: 92,
                 title: Padding(
@@ -122,9 +156,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          const Text(
-                            'John Doe',
-                            style: TextStyle(
+                          Text(
+                            _displayName ?? 'Guest',
+                            style: const TextStyle(
                               fontSize: 15,
                               color: Color(0xFF1A1A2E),
                               fontWeight: FontWeight.w700,
