@@ -3,12 +3,17 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../utils/snackbar_helper.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/report.dart';
 import '../providers/report_provider.dart';
 import '../services/location_service.dart';
 import '../services/media_service.dart';
+import '../services/cloudinary_service.dart';
+import '../services/notification_service.dart';
 
 const List<String> PUNJAB_CITIES = [
   "Bahawalpur",
@@ -399,50 +404,107 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
     setState(() => _isSubmitting = true);
 
-    // Simulate AI verification delay
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
+    try {
+      // ── Step A: Upload all images to Cloudinary ─────────────────────────
+      final uploadFutures = _imagePaths
+          .map((path) => CloudinaryService.uploadImage(path))
+          .toList();
+      final uploadResults = await Future.wait(uploadFutures);
 
-    final locationParts = <String>[];
-    if (_address1Ctrl.text.trim().isNotEmpty) {
-      locationParts.add(_address1Ctrl.text.trim());
-    } else if (_streetCtrl.text.trim().isNotEmpty) {
-      locationParts.add(_streetCtrl.text.trim());
-    }
-    locationParts.add(_areaCtrl.text.trim());
-    locationParts.add(_cityCtrl.text.trim());
-    if (_landmarkCtrl.text.trim().isNotEmpty) {
-      locationParts.add('Near ${_landmarkCtrl.text.trim()}');
-    }
-    final report = Report(
-      id: const Uuid().v4(),
-      title: _selectedCategory!.label,
-      category: _selectedCategory!,
-      location: locationParts.join(', '),
-      latitude: _latitude,
-      longitude: _longitude,
-      status: ReportStatus.received,
-      createdAt: DateTime.now(),
-      description: _descriptionCtrl.text.trim().isEmpty
-          ? null
-          : _descriptionCtrl.text.trim(),
-        // For now we save the primary media path (first image) to the model
-        mediaPath: _imagePaths.isNotEmpty ? _imagePaths.first : null,
+      // Filter out any failed uploads (null results)
+      final imageUrls = uploadResults.whereType<String>().toList();
+
+      // Primary image URL (first successfully uploaded image)
+      final primaryImageUrl = imageUrls.isNotEmpty ? imageUrls.first : null;
+
+      if (!mounted) return;
+
+      // ── Step B: Build location string ───────────────────────────────────
+      final locationParts = <String>[];
+      if (_address1Ctrl.text.trim().isNotEmpty) {
+        locationParts.add(_address1Ctrl.text.trim());
+      } else if (_streetCtrl.text.trim().isNotEmpty) {
+        locationParts.add(_streetCtrl.text.trim());
+      }
+      locationParts.add(_areaCtrl.text.trim());
+      locationParts.add(_cityCtrl.text.trim());
+      if (_landmarkCtrl.text.trim().isNotEmpty) {
+        locationParts.add('Near ${_landmarkCtrl.text.trim()}');
+      }
+
+      final report = Report(
+        id: const Uuid().v4(),
+        title: _selectedCategory!.label,
+        category: _selectedCategory!,
+        location: locationParts.join(', '),
+        latitude: _latitude,
+        longitude: _longitude,
+        status: ReportStatus.received,
+        createdAt: DateTime.now(),
+        description: _descriptionCtrl.text.trim().isEmpty
+            ? null
+            : _descriptionCtrl.text.trim(),
+        // Store primary Cloudinary URL (or null) in the model's mediaPath
+        mediaPath: primaryImageUrl,
         isVideo: false,
-      updates: [
-        ReportUpdate(
-          message: 'Report received and queued for AI verification.',
-          timestamp: DateTime.now(),
-          isOfficial: true,
-        ),
-      ],
-    );
+        updates: [
+          ReportUpdate(
+            message: 'Report received and queued for AI verification.',
+            timestamp: DateTime.now(),
+            isOfficial: true,
+          ),
+        ],
+      );
 
-    await context.read<ReportProvider>().addReport(report);
+      // ── Step C: Build and push Firestore document ────────────────────────
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final data = {
+        'id': report.id,
+        'title': report.title,
+        'category': report.category.name,
+        'location': report.location,
+        'latitude': report.latitude,
+        'longitude': report.longitude,
+        'status': 'Received',
+        'timestamp': FieldValue.serverTimestamp(),
+        'userId': uid,
+        'description': report.description,
+        // Primary Cloudinary URL for backwards-compatible reads
+        'imageUrl': primaryImageUrl,
+        // Full list of uploaded image URLs
+        'imageUrls': imageUrls,
+        'isVideo': report.isVideo,
+        'updates': report.updates.map((u) => u.toJson()).toList(),
+      };
 
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
-    _showSuccessDialog(report.id);
+      await FirebaseFirestore.instance
+          .collection('reports')
+          .doc(report.id)
+          .set(data);
+
+      // ── Step D: Send 'Report Received' notification ──────────────────────
+      if (uid != null) {
+        await NotificationService.sendNotification(
+          userId: uid,
+          reportId: report.id,
+          title: 'Report Received',
+          body: 'Your "${report.title}" report has been received and is queued for verification.',
+        );
+      }
+
+      if (!mounted) return;
+      SnackBarHelper.showSuccess(context, 'Report submitted successfully.');
+      _showSuccessDialog(report.id);
+    } catch (e) {
+      // ignore: avoid_print
+      print('REPORT SUBMIT ERROR: $e');
+      if (!mounted) return;
+      SnackBarHelper.showError(context, 'Failed to submit report: ${e.toString()}');
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   void _showCityPicker() {
@@ -586,7 +648,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                     color: Color(0xFF1A1A2E))),
             const SizedBox(height: 8),
             const Text(
-              'Your report is being AI verified.\nYou\'ll receive updates shortly.',
+              'Your report is being verified.\nYou\'ll receive updates shortly.',
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 14, color: Color(0xFF757575), height: 1.5),
@@ -601,13 +663,13 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                       Navigator.pop(context);
                     },
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF1565C0)),
+                      side: const BorderSide(color: Color(0xFF064554)),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     child: const Text('Home',
-                        style: TextStyle(color: Color(0xFF1565C0))),
+                        style: TextStyle(color: Color(0xFF064554))),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -620,7 +682,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           arguments: reportId);
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1565C0),
+                      backgroundColor: const Color(0xFF064554),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -640,20 +702,29 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: const Color(0xFFF0F7F8),
       appBar: AppBar(
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF064554), Color(0xFF0a6378)],
+            ),
+          ),
+        ),
         title: const Text('Create Report',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: Colors.white)),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_rounded,
+              size: 20, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: const Color(0xFFEEEEEE)),
-        ),
       ),
       body: Stack(
         children: [
@@ -669,10 +740,10 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                   duration: const Duration(milliseconds: 300),
                   height: 180,
                   decoration: BoxDecoration(
-                    color: _imagePaths.isNotEmpty ? const Color(0xFF1565C0).withOpacity(0.06) : Colors.white,
+                    color: _imagePaths.isNotEmpty ? const Color(0xFF064554).withOpacity(0.06) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: _imagePaths.isNotEmpty ? const Color(0xFF1565C0).withOpacity(0.4) : (_invalidFields.contains('media') ? const Color(0xFFB71C1C) : const Color(0xFFE0E0E0)),
+                      color: _imagePaths.isNotEmpty ? const Color(0xFF064554).withOpacity(0.4) : (_invalidFields.contains('media') ? const Color(0xFFB71C1C) : const Color(0xFFE0E0E0)),
                       width: _imagePaths.isNotEmpty ? 2 : 1.5,
                     ),
                     boxShadow: [
@@ -727,12 +798,12 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                               height: 52,
                               decoration: BoxDecoration(
                                 color: sel
-                                    ? const Color(0xFF1565C0)
+                                    ? const Color(0xFF064554)
                                     : const Color(0xFFF5F7FA),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                     color: sel
-                                        ? const Color(0xFF1565C0)
+                                        ? const Color(0xFF064554)
                                         : const Color(0xFFE0E0E0)),
                               ),
                               child: Icon(cat.icon,
@@ -755,7 +826,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                                     fontWeight:
                                         sel ? FontWeight.w700 : FontWeight.w400,
                                     color: sel
-                                        ? const Color(0xFF1565C0)
+                                        ? const Color(0xFF064554)
                                         : const Color(0xFF757575),
                                     height: 1.2,
                                   ),
@@ -817,7 +888,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                                 borderSide: BorderSide(
                                     color: _invalidFields.contains('address1')
                                         ? const Color(0xFFB71C1C)
-                                        : const Color(0xFF1565C0)),
+                                        : const Color(0xFF064554)),
                               ),
                             ),
                           ),
@@ -828,7 +899,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           child: ElevatedButton(
                             onPressed: _locating ? null : _fetchLocation,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1565C0),
+                              backgroundColor: const Color(0xFF064554),
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10)),
                             ),
@@ -871,7 +942,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                           borderSide: BorderSide(
                               color: _invalidFields.contains('street')
                                   ? const Color(0xFFB71C1C)
-                                  : const Color(0xFF1565C0)),
+                                  : const Color(0xFF064554)),
                         ),
                       ),
                     ),
@@ -907,7 +978,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                                 borderSide: BorderSide(
                                     color: _invalidFields.contains('area')
                                         ? const Color(0xFFB71C1C)
-                                        : const Color(0xFF1565C0)),
+                                        : const Color(0xFF064554)),
                               ),
                             ),
                           ),
@@ -935,7 +1006,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                                 borderSide: BorderSide(
                                     color: _invalidFields.contains('city')
                                         ? const Color(0xFFB71C1C)
-                                        : const Color(0xFF1565C0)),
+                                        : const Color(0xFF064554)),
                               ),
                             ),
                           ),
@@ -1015,19 +1086,26 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
               const SizedBox(height: 32),
               // ── Submit ───────────────────────────────────────────────────────
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submitReport,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1565C0),
-                    disabledBackgroundColor:
-                        const Color(0xFF1565C0).withOpacity(0.6),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                    elevation: 3,
-                    shadowColor: const Color(0xFF1565C0).withOpacity(0.4),
+              GestureDetector(
+                onTap: _isSubmitting ? null : _submitReport,
+                child: Container(
+                  width: double.infinity,
+                  height: 54,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: _isSubmitting 
+                          ? [const Color(0xFF90CAF9), const Color(0xFF64B5F6)]
+                          : [const Color(0xFF064554), const Color(0xFF0a6378)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: _isSubmitting ? [] : [
+                      BoxShadow(
+                        color: const Color(0xFF064554).withOpacity(0.35),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: _isSubmitting
                       ? const SizedBox(
@@ -1149,11 +1227,11 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add, size: 28, color: Color(0xFF1565C0)),
+                    Icon(Icons.add, size: 28, color: Color(0xFF064554)),
                     SizedBox(height: 6),
                     Text('Add',
                         style: TextStyle(
-                            color: Color(0xFF1565C0),
+                            color: Color(0xFF064554),
                             fontWeight: FontWeight.w600)),
                   ],
                 ),
@@ -1173,18 +1251,18 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           width: 56,
           height: 56,
           decoration: BoxDecoration(
-            color: const Color(0xFF1565C0).withOpacity(0.08),
+            color: const Color(0xFF064554).withOpacity(0.08),
             shape: BoxShape.circle,
           ),
           child: const Icon(Icons.add_photo_alternate_outlined,
-              color: Color(0xFF1565C0), size: 28),
+              color: Color(0xFF064554), size: 28),
         ),
         const SizedBox(height: 12),
         const Text('Add Photo',
             style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1565C0))),
+                color: Color(0xFF064554))),
         const SizedBox(height: 6),
         const Text('Tap to capture or upload from gallery',
             style: TextStyle(fontSize: 12, color: Color(0xFF9E9E9E))),
@@ -1223,31 +1301,37 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFF1565C0).withOpacity(0.08),
+        color: const Color(0xFF064554).withOpacity(0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF1565C0).withOpacity(0.2)),
+        border: Border.all(color: const Color(0xFF064554).withOpacity(0.2)),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 15, color: const Color(0xFF1565C0)),
+          Icon(icon, size: 15, color: const Color(0xFF064554)),
           const SizedBox(width: 5),
           Text(label,
               style: const TextStyle(
                   fontSize: 12,
-                  color: Color(0xFF1565C0),
+                  color: Color(0xFF064554),
                   fontWeight: FontWeight.w600)),
         ],
       ),
     );
   }
 
-  Widget _sectionLabel(String text) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF9E9E9E),
-          letterSpacing: 0.5,
+  Widget _sectionLabel(String text) => Container(
+        padding: const EdgeInsets.only(left: 12),
+        decoration: const BoxDecoration(
+          border: Border(left: BorderSide(color: Color(0xFF0a6378), width: 4)),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0D1B3E),
+            letterSpacing: 0.5,
+          ),
         ),
       );
 
@@ -1258,10 +1342,10 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: const Color(0xFF1565C0).withOpacity(0.08),
+          color: const Color(0xFF064554).withOpacity(0.08),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: const Color(0xFF1565C0), size: 22),
+        child: Icon(icon, color: const Color(0xFF064554), size: 22),
       ),
       title: Text(label,
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),

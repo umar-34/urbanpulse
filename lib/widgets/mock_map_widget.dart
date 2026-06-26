@@ -119,11 +119,13 @@ class MockMapWidget extends StatelessWidget {
       case ReportStatus.received:
         return const Color(0xFF9E9E9E);
       case ReportStatus.aiVerified:
-        return const Color(0xFF1565C0);
+        return const Color(0xFF064554);
       case ReportStatus.assignedToDept:
         return const Color(0xFFFB8C00);
       case ReportStatus.resolved:
         return const Color(0xFF43A047);
+      case ReportStatus.rejected:
+        return const Color(0xFFE53935);
     }
   }
 

@@ -38,7 +38,7 @@
 ### 👁 See All Button (Fixed)
 - Navigates to the new `AllReportsScreen`
 - Search bar: filter reports by title, location, or description
-- Filter chips: filter by status (Received / AI Verified / In Progress / Resolved)
+ - Filter chips: filter by status (Received / Verified / In Progress / Resolved)
 - Swipe-to-delete on My Reports screen
 
 ### 📊 Report Detail (Live)

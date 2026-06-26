@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 import '../providers/report_provider.dart';
 import '../models/report.dart';
 import '../widgets/status_badge.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class MyReportsScreen extends StatefulWidget {
   const MyReportsScreen({super.key});
@@ -12,14 +15,74 @@ class MyReportsScreen extends StatefulWidget {
   State<MyReportsScreen> createState() => _MyReportsScreenState();
 }
 
+Report _reportFromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+  final data = doc.data();
+  final id = doc.id;
+  final title = (data['title'] ?? '').toString();
+  final location = (data['location'] ?? '').toString();
+  final categoryStr = (data['category'] ?? '').toString().trim();
+  final statusStr = (data['status'] ?? '').toString().trim();
+  final timestamp = data['timestamp'] as Timestamp?;
+  final createdAt = timestamp != null ? timestamp.toDate() : DateTime.now();
+  IssueCategory category = IssueCategory.other;
+  try {
+    final cs = categoryStr.toLowerCase();
+    category = IssueCategory.values.firstWhere(
+        (e) => e.name.toLowerCase() == cs || e.label.toLowerCase() == cs);
+  } catch (_) {}
+  ReportStatus status = ReportStatus.received;
+  try {
+    final s = statusStr.toLowerCase();
+    if (s.contains('reject') || s.contains('invalid') || s.contains('denied')) {
+      status = ReportStatus.rejected;
+    } else if (s.contains('resolv')) {
+      status = ReportStatus.resolved;
+    } else if (s.contains('active') ||
+        s.contains('pending') ||
+        s.contains('in progress') ||
+        s.contains('assigned')) {
+      status = ReportStatus.assignedToDept;
+    } else if (s.contains('ai') || s.contains('verified')) {
+      status = ReportStatus.aiVerified;
+    } else if (s.contains('received')) {
+      status = ReportStatus.received;
+    } else {
+      status = ReportStatus.values.firstWhere((e) => e.name.toLowerCase() == s,
+          orElse: () => ReportStatus.received);
+    }
+  } catch (_) {}
+
+  return Report(
+    id: id,
+    title: title,
+    category: category,
+    location: location,
+    latitude: (data['latitude'] as num?)?.toDouble(),
+    longitude: (data['longitude'] as num?)?.toDouble(),
+    status: status,
+    rawStatus: statusStr,
+    createdAt: createdAt,
+    description: data['description'] as String?,
+    mediaPath: data['imageUrl'] as String?,
+    isVideo: false,
+  );
+}
+
+// top-level helper removed (duplicate); keep single _reportFromDoc at file end
+
 class _MyReportsScreenState extends State<MyReportsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  String selectedStatus = 'All';
+  int allCount = 0;
+  int activeCount = 0;
+  int resolvedCount = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() => setState(() {}));
   }
 
   @override
@@ -28,37 +91,31 @@ class _MyReportsScreenState extends State<MyReportsScreen>
     super.dispose();
   }
 
-  List<Report> _filtered(List<Report> all, int tab) {
-    switch (tab) {
-      case 0:
-        return all;
-      case 1:
-        return all
-            .where((r) => r.status != ReportStatus.resolved)
-            .toList();
-      case 2:
-        return all
-            .where((r) => r.status == ReportStatus.resolved)
-            .toList();
-      default:
-        return all;
-    }
-  }
+  // client-side filtering removed; Stream now filters documents directly in builder
 
   @override
   Widget build(BuildContext context) {
     return Consumer<ReportProvider>(
       builder: (context, provider, _) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
+          backgroundColor: const Color(0xFFF0F7F8),
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            flexibleSpace: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF064554), Color(0xFF0a6378)],
+                ),
+              ),
+            ),
+            backgroundColor: Colors.transparent,
             elevation: 0,
             title: const Text('My Reports',
                 style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A2E))),
+                    color: Colors.white)),
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 12),
@@ -66,69 +123,153 @@ class _MyReportsScreenState extends State<MyReportsScreen>
                   onPressed: () =>
                       Navigator.pushNamed(context, '/create-report'),
                   icon: const Icon(Icons.add_rounded,
-                      size: 18, color: Color(0xFF1565C0)),
+                      size: 18, color: Colors.white),
                   label: const Text('New',
                       style: TextStyle(
-                          color: Color(0xFF1565C0),
+                          color: Colors.white,
                           fontWeight: FontWeight.w600)),
                 ),
               ),
             ],
             bottom: TabBar(
               controller: _tabController,
-              labelColor: const Color(0xFF1565C0),
-              unselectedLabelColor: const Color(0xFF9E9E9E),
-              indicatorColor: const Color(0xFF1565C0),
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white60,
+              indicatorColor: Colors.white,
               indicatorWeight: 2.5,
-              labelStyle: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w600),
-              onTap: (_) => setState(() {}),
+              labelStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              onTap: (index) => setState(() {
+                _tabController.index = index;
+                selectedStatus =
+                    index == 0 ? 'All' : (index == 1 ? 'Active' : 'Resolved');
+              }),
               tabs: [
-                Tab(text: 'All (${provider.totalCount})'),
-                Tab(text: 'Active (${provider.activeCount})'),
-                Tab(text: 'Resolved (${provider.resolvedCount})'),
+                Tab(text: 'All ($allCount)'),
+                Tab(text: 'Active ($activeCount)'),
+                Tab(text: 'Resolved ($resolvedCount)'),
               ],
             ),
           ),
-          body: AnimatedBuilder(
-            animation: _tabController,
-            builder: (context, _) {
-              final reports = _filtered(
-                  provider.reports, _tabController.index);
-              if (reports.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.inbox_rounded,
-                          size: 60, color: Colors.grey.shade200),
-                      const SizedBox(height: 12),
-                      const Text('No reports here',
-                          style: TextStyle(
-                              color: Color(0xFFBDBDBD), fontSize: 15)),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: () =>
-                            Navigator.pushNamed(context, '/create-report'),
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('Create Report'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1565C0),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ],
+          body: Builder(
+            builder: (context) {
+              final userId = FirebaseAuth.instance.currentUser?.uid;
+              if (userId == null) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 30),
+                    child: Text(
+                      "You haven't submitted any reports yet. Click the button below to submit a new report.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFFBDBDBD), fontSize: 15),
+                    ),
                   ),
                 );
               }
-              return ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: reports.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, i) =>
-                    _ReportTile(report: reports[i]),
+
+              // ── Single-clause query — no .orderBy() — avoids composite index ──
+              final stream = FirebaseFirestore.instance
+                  .collection('reports')
+                  .where('userId', isEqualTo: userId) // fixed
+                  .snapshots();
+
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: stream,
+                builder: (context, snap) {
+                  if (snap.hasError) {
+                    // print error and show simple message
+                    // ignore: avoid_print
+                    print('Firestore stream error: ${snap.error}');
+                    return const Center(child: Text('Something went wrong'));
+                  }
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.only(top: 40),
+                      child: Center(
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2.5, color: Color(0xFF064554)),
+                        ),
+                      ),
+                    );
+                  }
+
+                  final docs = snap.data?.docs ?? [];
+
+                  // ── Map documents → Report objects ──
+                  final allReports = docs.map((d) => _reportFromDoc(d)).toList()
+                    // Sort newest-first in Dart (no Firestore index needed)
+                    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+                  // ── Compute tab counts ──
+                  final newAll = allReports.length;
+                  final newActive = allReports
+                      .where((r) =>
+                          r.status != ReportStatus.resolved &&
+                          r.status != ReportStatus.rejected)
+                      .length;
+                  final newResolved = allReports
+                      .where((r) => r.status == ReportStatus.resolved)
+                      .length;
+
+                  if (newAll != allCount ||
+                      newActive != activeCount ||
+                      newResolved != resolvedCount) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
+                      setState(() {
+                        allCount = newAll;
+                        activeCount = newActive;
+                        resolvedCount = newResolved;
+                      });
+                    });
+                  }
+
+                  // ── Tab filtering in Dart ──
+                  final filtered = allReports.where((r) {
+                    if (_tabController.index == 0) return true; // All
+                    if (_tabController.index == 1) {
+                      // Active: exclude resolved AND rejected
+                      return r.status != ReportStatus.resolved &&
+                          r.status != ReportStatus.rejected;
+                    }
+                    return r.status == ReportStatus.resolved; // Resolved
+                  }).toList();
+
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 30),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.inbox_rounded,
+                                size: 60, color: Colors.grey.shade200),
+                            const SizedBox(height: 12),
+                            const Text(
+                              "You haven't submitted any reports yet. "
+                              'Click the button below to submit a new report.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  color: Color(0xFFBDBDBD), fontSize: 15),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, i) {
+                      return _ReportTile(report: filtered[i]);
+                    },
+                  );
+                },
               );
             },
           ),
@@ -184,125 +325,85 @@ class _ReportTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-      key: Key(report.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/report-detail',
+          arguments: report.id),
+      child: Container(
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFE53935),
-          borderRadius: BorderRadius.circular(14),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.withOpacity(0.15)),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4)),
+          ],
         ),
-        child: const Icon(Icons.delete_outline_rounded,
-            color: Colors.white, size: 26),
-      ),
-      confirmDismiss: (_) async {
-        return await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
-            title: const Text('Delete Report'),
-            content: const Text(
-                'Are you sure you want to delete this report?'),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel')),
-              TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Delete',
-                      style: TextStyle(color: Color(0xFFE53935)))),
-            ],
-          ),
-        );
-      },
-      onDismissed: (_) {
-        context.read<ReportProvider>().deleteReport(report.id);
-      },
-      child: GestureDetector(
-        onTap: () =>
-            Navigator.pushNamed(context, '/report-detail',
-                arguments: report.id),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2)),
-            ],
-          ),
-          child: Row(
-            children: [
-              // Thumbnail
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: report.mediaPath != null
-                    ? (report.isVideo
-                        ? Container(
-                            width: 56,
-                            height: 56,
-                            color: const Color(0xFF263238),
-                            child: const Icon(Icons.play_circle_fill_rounded,
-                                color: Colors.white, size: 26),
-                          )
-                        : Image.file(
-                            File(report.mediaPath!),
-                            width: 56,
-                            height: 56,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                _iconBox(report.category),
-                          ))
-                    : _iconBox(report.category),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(report.title,
-                        style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1A1A2E))),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined,
-                            size: 11, color: Color(0xFF9E9E9E)),
-                        const SizedBox(width: 2),
-                        Expanded(
-                          child: Text(report.location,
-                              style: const TextStyle(
-                                  fontSize: 12, color: Color(0xFF9E9E9E)),
-                              overflow: TextOverflow.ellipsis),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    StatusBadge(status: report.status, compact: true),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Thumbnail: supports Cloudinary HTTPS URLs and local file paths
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: report.mediaPath != null
+                  ? _buildThumbnail(report)
+                  : _iconBox(report.category),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_fmt(report.createdAt),
+                  Text(report.title,
                       style: const TextStyle(
-                          fontSize: 11, color: Color(0xFFBDBDBD))),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1A2E),
+                          letterSpacing: 0.2)),
                   const SizedBox(height: 6),
-                  const Icon(Icons.chevron_right_rounded,
-                      color: Color(0xFFBDBDBD), size: 18),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on_rounded,
+                          size: 14, color: Color(0xFF78909C)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(report.location,
+                            style: const TextStyle(
+                                fontSize: 13, color: Color(0xFF78909C), fontWeight: FontWeight.w500),
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  StatusBadge(
+                      status: report.status,
+                      rawLabel: report.rawStatus,
+                      compact: true),
                 ],
               ),
-            ],
-          ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(_fmt(report.createdAt),
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF90A4AE))),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE8F2F4),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.arrow_forward_ios_rounded,
+                      color: Color(0xFF064554), size: 14),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -311,20 +412,59 @@ class _ReportTile extends StatelessWidget {
   Widget _iconBox(IssueCategory cat) {
     final color = _catColor(cat);
     return Container(
-      width: 56,
-      height: 56,
+      width: 64,
+      height: 64,
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(_catIcon(cat), color: color, size: 26),
+      child: Icon(_catIcon(cat), color: color, size: 28),
     );
+  }
+
+  /// Renders a 64×64 thumbnail. Handles:
+  ///   • Cloudinary / remote HTTPS URLs  → CachedNetworkImage
+  ///   • Local file paths                → Image.file
+  ///   • Video reports                   → play-button overlay
+  Widget _buildThumbnail(Report report) {
+    if (report.isVideo) {
+      return Container(
+        width: 64,
+        height: 64,
+        color: const Color(0xFF263238),
+        child: const Icon(Icons.play_circle_fill_rounded,
+            color: Colors.white, size: 28),
+      );
+    }
+    final path = report.mediaPath!;
+    if (path.startsWith('http')) {
+      return CachedNetworkImage(
+        imageUrl: path,
+        width: 64,
+        height: 64,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => _iconBox(report.category),
+        errorWidget: (_, __, ___) => _iconBox(report.category),
+      );
+    }
+    // Local file path (e.g. camera capture before upload)
+    try {
+      final file = File(path);
+      if (file.existsSync()) {
+        return Image.file(file,
+            width: 64,
+            height: 64,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _iconBox(report.category));
+      }
+    } catch (_) {}
+    return _iconBox(report.category);
   }
 
   Color _catColor(IssueCategory cat) {
     switch (cat) {
       case IssueCategory.pothole:
-        return const Color(0xFF1565C0);
+        return const Color(0xFF064554);
       case IssueCategory.garbage:
         return const Color(0xFF6D4C41);
       case IssueCategory.brokenStreetlight:
@@ -352,7 +492,20 @@ class _ReportTile extends StatelessWidget {
   }
 
   String _fmt(DateTime d) {
-    const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const m = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return '${m[d.month - 1]} ${d.day}';
   }
 }

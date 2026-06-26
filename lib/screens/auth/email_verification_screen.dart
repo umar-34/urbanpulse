@@ -3,7 +3,7 @@ import 'auth_theme.dart';
 import 'profile_completion_screen.dart';
 
 class EmailVerificationMockScreen extends StatelessWidget {
-  const EmailVerificationMockScreen({Key? key}) : super(key: key);
+  const EmailVerificationMockScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,12 +21,18 @@ class EmailVerificationMockScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 40),
-            Icon(Icons.mark_email_unread, size: 96, color: kPrimaryBlue),
+            const Icon(Icons.mark_email_unread, size: 96, color: kPrimaryBlue),
             const SizedBox(height: 24),
             const Text(
               "Verify your email. We've sent a link to your inbox.",
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+            SizedBox(height: 12),
+            const Text(
+              "Don't forget to check your spam folder if you don't see it!",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Color.fromARGB(221, 245, 56, 56)),
             ),
             const Spacer(),
             ElevatedButton(

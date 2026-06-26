@@ -12,7 +12,20 @@
           "package_name": "com.urbanpulse.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "507869709107-ulfnq7318j8iu8rfljmh30ef8s1h0p6a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.urbanpulse.app",
+            "certificate_hash": "bbcb548107cfe7c6f23331051e9cbbb8a61d5ca2"
+          }
+        },
+        {
+          "client_id": "507869709107-upc3dededc58cnmm3ro2dg51hmam6vdm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCVttGoWliRHEIJhdtNYisKqE-kFWqYzcs"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "507869709107-upc3dededc58cnmm3ro2dg51hmam6vdm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

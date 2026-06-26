@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/report_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+// provider and report_provider no longer needed; using Firestore stream
 import '../models/report.dart';
 import '../widgets/status_badge.dart';
+import '../widgets/report_card.dart';
 
 class AllReportsScreen extends StatefulWidget {
   const AllReportsScreen({super.key});
@@ -44,26 +46,166 @@ class _AllReportsScreenState extends State<AllReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ReportProvider>(
-      builder: (context, provider, _) {
-        final filtered = _applyFilters(provider.reports);
+    final stream = FirebaseFirestore.instance
+        .collection('reports')
+        .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+        .snapshots();
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: stream,
+      builder: (context, snap) {
+        if (snap.hasError) {
+          // ignore: avoid_print
+          print('AllReports stream error: ${snap.error}');
+          return const Scaffold(
+              body: Center(child: Text('Something went wrong')));
+        }
+        if (snap.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFF0F7F8),
+            appBar: AppBar(
+              flexibleSpace: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF064554), Color(0xFF0a6378)],
+                  ),
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_rounded,
+                    size: 20, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: const Text(
+                'All Reports',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white),
+              ),
+            ),
+            body: Column(
+              children: [
+                Container(
+                  color: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _search = v),
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Search reports…',
+                      hintStyle: const TextStyle(color: Color(0xFFBDBDBD)),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: Color(0xFF9E9E9E), size: 20),
+                      filled: true,
+                      fillColor: const Color(0xFFF5F7FA),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: 6,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, __) => const ReportListTileSkeleton(),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        final docs = snap.data?.docs ?? [];
+        final reports = docs.map((doc) {
+          final data = doc.data();
+          final id = doc.id;
+          final categoryStr = (data['category'] ?? '').toString().trim();
+          final statusStr = (data['status'] ?? '').toString().trim();
+          final timestamp = data['timestamp'] as Timestamp?;
+          final createdAt =
+              timestamp != null ? timestamp.toDate() : DateTime.now();
+          IssueCategory category = IssueCategory.other;
+          try {
+            final cs = categoryStr.toLowerCase();
+            category = IssueCategory.values.firstWhere((e) =>
+                e.name.toLowerCase() == cs || e.label.toLowerCase() == cs);
+          } catch (_) {}
+          ReportStatus status = ReportStatus.received;
+          try {
+            final s = statusStr.toLowerCase();
+            if (s.contains('resolv')) {
+              status = ReportStatus.resolved;
+            } else if (s.contains('ai') || s.contains('verified')) {
+              status = ReportStatus.aiVerified;
+            } else if (s.contains('active') ||
+                s.contains('pending') ||
+                s.contains('in progress') ||
+                s.contains('assigned')) {
+              status = ReportStatus.assignedToDept;
+            } else if (s.contains('received')) {
+              status = ReportStatus.received;
+            } else {
+              status = ReportStatus.values.firstWhere(
+                  (e) => e.name.toLowerCase() == s,
+                  orElse: () => ReportStatus.received);
+            }
+          } catch (_) {}
+          return Report(
+            id: id,
+            title: (data['title'] ?? '').toString(),
+            category: category,
+            location: (data['location'] ?? '').toString(),
+            latitude: (data['latitude'] as num?)?.toDouble(),
+            longitude: (data['longitude'] as num?)?.toDouble(),
+            status: status,
+            rawStatus: statusStr,
+            createdAt: createdAt,
+            description: data['description'] as String?,
+            mediaPath: data['imageUrl'] as String?,
+            isVideo: false,
+          );
+        }).toList();
+        
+        // Local sort (newest first) replaces Firestore orderBy to prevent index errors
+        reports.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+        final filtered = _applyFilters(reports);
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF5F7FA),
+          backgroundColor: const Color(0xFFF0F7F8),
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            flexibleSpace: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF064554), Color(0xFF0a6378)],
+                ),
+              ),
+            ),
+            backgroundColor: Colors.transparent,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_rounded, size: 20),
+              icon: const Icon(Icons.arrow_back_ios_rounded,
+                  size: 20, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
             title: const Text(
               'All Reports',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-            ),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(1),
-              child: Container(height: 1, color: const Color(0xFFEEEEEE)),
+              style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white),
             ),
           ),
           body: Column(
@@ -108,14 +250,14 @@ class _AllReportsScreenState extends State<AllReportsScreen> {
                 color: Colors.white,
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.only(
-                      left: 16, right: 16, bottom: 12),
+                  padding:
+                      const EdgeInsets.only(left: 16, right: 16, bottom: 12),
                   child: Row(
                     children: [
                       _filterChip(
                         label: 'All',
-                        selected: _filterStatus == null &&
-                            _filterCategory == null,
+                        selected:
+                            _filterStatus == null && _filterCategory == null,
                         onTap: () => setState(() {
                           _filterStatus = null;
                           _filterCategory = null;
@@ -129,8 +271,7 @@ class _AllReportsScreenState extends State<AllReportsScreen> {
                               selected: _filterStatus == s,
                               color: _statusColor(s),
                               onTap: () => setState(() {
-                                _filterStatus =
-                                    _filterStatus == s ? null : s;
+                                _filterStatus = _filterStatus == s ? null : s;
                                 _filterCategory = null;
                               }),
                             ),
@@ -178,8 +319,7 @@ class _AllReportsScreenState extends State<AllReportsScreen> {
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                         itemCount: filtered.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 10),
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (context, i) =>
                             _ReportListTile(report: filtered[i]),
                       ),
@@ -197,7 +337,7 @@ class _AllReportsScreenState extends State<AllReportsScreen> {
     Color? color,
     required VoidCallback onTap,
   }) {
-    final c = color ?? const Color(0xFF1565C0);
+    final c = color ?? const Color(0xFF064554);
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -227,11 +367,13 @@ class _AllReportsScreenState extends State<AllReportsScreen> {
       case ReportStatus.received:
         return const Color(0xFF9E9E9E);
       case ReportStatus.aiVerified:
-        return const Color(0xFF1565C0);
+        return const Color(0xFF2196F3);
       case ReportStatus.assignedToDept:
-        return const Color(0xFFFB8C00);
+        return const Color(0xFFFFC107);
       case ReportStatus.resolved:
-        return const Color(0xFF43A047);
+        return const Color(0xFF4CAF50);
+      case ReportStatus.rejected:
+        return const Color(0xFFE53935);
     }
   }
 }
@@ -250,34 +392,36 @@ class _ReportListTile extends StatelessWidget {
         arguments: report.id,
       ),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.withOpacity(0.15)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Thumbnail
             ClipRRect(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
               child: report.mediaPath != null
                   ? Image.file(
                       File(report.mediaPath!),
-                      width: 56,
-                      height: 56,
+                      width: 64,
+                      height: 64,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => _iconBox(report.category),
                     )
                   : _iconBox(report.category),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -285,43 +429,53 @@ class _ReportListTile extends StatelessWidget {
                   Text(
                     report.title,
                     style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                       color: Color(0xFF1A1A2E),
+                      letterSpacing: 0.2,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined,
-                          size: 12, color: Color(0xFF9E9E9E)),
-                      const SizedBox(width: 2),
+                      const Icon(Icons.location_on_rounded,
+                          size: 14, color: Color(0xFF78909C)),
+                      const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           report.location,
                           style: const TextStyle(
-                              fontSize: 12, color: Color(0xFF9E9E9E)),
+                              fontSize: 13, color: Color(0xFF78909C), fontWeight: FontWeight.w500),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  StatusBadge(status: report.status),
+                  const SizedBox(height: 10),
+                  StatusBadge(
+                      status: report.status, rawLabel: report.rawStatus, compact: true),
                 ],
               ),
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   _formatDate(report.createdAt),
-                  style: const TextStyle(
-                      fontSize: 11, color: Color(0xFFBDBDBD)),
+                  style:
+                      const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF90A4AE)),
                 ),
-                const SizedBox(height: 6),
-                const Icon(Icons.chevron_right_rounded,
-                    color: Color(0xFFBDBDBD), size: 18),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF0F7F8),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.arrow_forward_ios_rounded,
+                      color: Color(0xFF064554), size: 14),
+                ),
               ],
             ),
           ],
@@ -332,20 +486,20 @@ class _ReportListTile extends StatelessWidget {
 
   Widget _iconBox(IssueCategory cat) {
     return Container(
-      width: 56,
-      height: 56,
+      width: 64,
+      height: 64,
       decoration: BoxDecoration(
         color: _catColor(cat).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(_catIcon(cat), color: _catColor(cat), size: 26),
+      child: Icon(_catIcon(cat), color: _catColor(cat), size: 28),
     );
   }
 
   Color _catColor(IssueCategory cat) {
     switch (cat) {
       case IssueCategory.pothole:
-        return const Color(0xFF1565C0);
+        return const Color(0xFF064554);
       case IssueCategory.garbage:
         return const Color(0xFF6D4C41);
       case IssueCategory.brokenStreetlight:
@@ -374,8 +528,18 @@ class _ReportListTile extends StatelessWidget {
 
   String _formatDate(DateTime d) {
     const m = [
-      'Jan','Feb','Mar','Apr','May','Jun',
-      'Jul','Aug','Sep','Oct','Nov','Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '${m[d.month - 1]} ${d.day}';
   }

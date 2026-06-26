@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/report.dart';
+import '../services/notification_service.dart';
 
 class ReportProvider extends ChangeNotifier {
   List<Report> _reports = [];
@@ -11,7 +14,7 @@ class ReportProvider extends ChangeNotifier {
 
   int get totalCount => _reports.length;
   int get activeCount =>
-      _reports.where((r) => r.status != ReportStatus.resolved).length;
+      _reports.where((r) => r.status != ReportStatus.resolved && r.status != ReportStatus.rejected).length;
   int get resolvedCount =>
       _reports.where((r) => r.status == ReportStatus.resolved).length;
 
@@ -22,8 +25,8 @@ class ReportProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList('reports');
     if (raw == null || raw.isEmpty) {
-      // First launch – seed sample data
-      _reports = List.from(seedReports);
+      // No persisted reports — start with an empty list
+      _reports = [];
     } else {
       _reports = raw.map((s) {
         try {
@@ -55,7 +58,7 @@ class ReportProvider extends ChangeNotifier {
     final idx = _reports.indexWhere((r) => r.id == id);
     if (idx == -1) return;
     final r = _reports[idx];
-    if (r.status == ReportStatus.resolved) return;
+    if (r.status == ReportStatus.resolved || r.status == ReportStatus.rejected) return;
 
     final next = ReportStatus.values[r.status.index + 1];
     final newUpdate = ReportUpdate(
@@ -70,6 +73,32 @@ class ReportProvider extends ChangeNotifier {
     );
     notifyListeners();
     await _save();
+
+    // ── Dual-write: update Firestore report + notify citizen ─────────────────
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final newStatusLabel = _statusLabel(next);
+    try {
+      final reportDoc = await FirebaseFirestore.instance
+          .collection('reports')
+          .doc(id)
+          .get();
+      final reportOwnerId =
+          (reportDoc.data()?['userId'] as String?) ?? uid ?? '';
+      final reportTitle =
+          (reportDoc.data()?['title'] as String?) ?? r.title;
+
+      await NotificationService.updateReportStatus(
+        reportId: id,
+        reportOwnerId: reportOwnerId,
+        reportTitle: reportTitle,
+        newStatus: newStatusLabel,
+        extraFields: {
+          'updates': _reports[idx].updates.map((u) => u.toJson()).toList(),
+        },
+      );
+    } catch (e) {
+      debugPrint('advanceStatus dual-write error: $e');
+    }
   }
 
   // ── Add comment ───────────────────────────────────────────────────────────
@@ -113,6 +142,23 @@ class ReportProvider extends ChangeNotifier {
         return 'Report assigned to the relevant department. Crew will be dispatched soon.';
       case ReportStatus.resolved:
         return 'Issue has been resolved. Thank you for your contribution!';
+      case ReportStatus.rejected:
+        return 'Report was rejected by the AI system. Please resubmit with a clearer image.';
+    }
+  }
+
+  String _statusLabel(ReportStatus status) {
+    switch (status) {
+      case ReportStatus.received:
+        return 'Received';
+      case ReportStatus.aiVerified:
+        return 'AI Verified';
+      case ReportStatus.assignedToDept:
+        return 'Assigned to Department';
+      case ReportStatus.resolved:
+        return 'Resolved';
+      case ReportStatus.rejected:
+        return 'Rejected';
     }
   }
 }
