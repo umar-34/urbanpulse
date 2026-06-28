@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/report_provider.dart';
@@ -68,8 +69,6 @@ Report _reportFromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
   );
 }
 
-// top-level helper removed (duplicate); keep single _reportFromDoc at file end
-
 class _MyReportsScreenState extends State<MyReportsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
@@ -90,8 +89,6 @@ class _MyReportsScreenState extends State<MyReportsScreen>
     _tabController.dispose();
     super.dispose();
   }
-
-  // client-side filtering removed; Stream now filters documents directly in builder
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +164,6 @@ class _MyReportsScreenState extends State<MyReportsScreen>
                 );
               }
 
-              // ── Single-clause query — no .orderBy() — avoids composite index ──
               final stream = FirebaseFirestore.instance
                   .collection('reports')
                   .where('userId', isEqualTo: userId) // fixed
@@ -177,7 +173,6 @@ class _MyReportsScreenState extends State<MyReportsScreen>
                 stream: stream,
                 builder: (context, snap) {
                   if (snap.hasError) {
-                    // print error and show simple message
                     // ignore: avoid_print
                     print('Firestore stream error: ${snap.error}');
                     return const Center(child: Text('Something went wrong'));
@@ -198,12 +193,9 @@ class _MyReportsScreenState extends State<MyReportsScreen>
 
                   final docs = snap.data?.docs ?? [];
 
-                  // ── Map documents → Report objects ──
                   final allReports = docs.map((d) => _reportFromDoc(d)).toList()
-                    // Sort newest-first in Dart (no Firestore index needed)
                     ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-                  // ── Compute tab counts ──
                   final newAll = allReports.length;
                   final newActive = allReports
                       .where((r) =>
@@ -227,11 +219,9 @@ class _MyReportsScreenState extends State<MyReportsScreen>
                     });
                   }
 
-                  // ── Tab filtering in Dart ──
                   final filtered = allReports.where((r) {
                     if (_tabController.index == 0) return true; // All
                     if (_tabController.index == 1) {
-                      // Active: exclude resolved AND rejected
                       return r.status != ReportStatus.resolved &&
                           r.status != ReportStatus.rejected;
                     }
@@ -262,7 +252,7 @@ class _MyReportsScreenState extends State<MyReportsScreen>
                   }
 
                   return ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 160),
                     itemCount: filtered.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, i) {
@@ -274,38 +264,52 @@ class _MyReportsScreenState extends State<MyReportsScreen>
             },
           ),
           floatingActionButton: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: GestureDetector(
-              onTap: () => Navigator.pushNamed(context, '/create-report'),
-              child: Container(
-                height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF43A047),
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF43A047).withOpacity(0.35),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add_rounded, color: Colors.white, size: 26),
-                    SizedBox(width: 8),
-                    Text(
-                      'Report Issue',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
+            padding: const EdgeInsets.only(bottom: 96),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, '/create-report'),
+                  child: Container(
+                    height: 48,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.62),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: const Color(0xFF064554).withOpacity(0.28),
+                        width: 1.2,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.10),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ],
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.add_rounded,
+                          color: Color(0xFF064554),
+                          size: 20,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Report Issue',
+                          style: TextStyle(
+                            color: Color(0xFF064554),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -328,82 +332,90 @@ class _ReportTile extends StatelessWidget {
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, '/report-detail',
           arguments: report.id),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.withOpacity(0.15)),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4)),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Thumbnail: supports Cloudinary HTTPS URLs and local file paths
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: report.mediaPath != null
-                  ? _buildThumbnail(report)
-                  : _iconBox(report.category),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.62),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFF064554).withOpacity(0.14),
+                width: 1.1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.07),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4)),
+              ],
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(report.title,
-                      style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A1A2E),
-                          letterSpacing: 0.2)),
-                  const SizedBox(height: 6),
-                  Row(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: report.mediaPath != null
+                      ? _buildThumbnail(report)
+                      : _iconBox(report.category),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.location_on_rounded,
-                          size: 14, color: Color(0xFF78909C)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(report.location,
-                            style: const TextStyle(
-                                fontSize: 13, color: Color(0xFF78909C), fontWeight: FontWeight.w500),
-                            overflow: TextOverflow.ellipsis),
+                      Text(report.title,
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1A1A2E),
+                              letterSpacing: 0.2)),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_rounded,
+                              size: 14, color: Color(0xFF78909C)),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(report.location,
+                                style: const TextStyle(
+                                    fontSize: 13, color: Color(0xFF78909C), fontWeight: FontWeight.w500),
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 10),
+                      StatusBadge(
+                          status: report.status,
+                          rawLabel: report.rawStatus,
+                          compact: true),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  StatusBadge(
-                      status: report.status,
-                      rawLabel: report.rawStatus,
-                      compact: true),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(_fmt(report.createdAt),
-                    style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF90A4AE))),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE8F2F4),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.arrow_forward_ios_rounded,
-                      color: Color(0xFF064554), size: 14),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(_fmt(report.createdAt),
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF90A4AE))),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF064554).withOpacity(0.10),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.arrow_forward_ios_rounded,
+                          color: Color(0xFF064554), size: 14),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -422,10 +434,8 @@ class _ReportTile extends StatelessWidget {
     );
   }
 
-  /// Renders a 64×64 thumbnail. Handles:
-  ///   • Cloudinary / remote HTTPS URLs  → CachedNetworkImage
-  ///   • Local file paths                → Image.file
-  ///   • Video reports                   → play-button overlay
+  ///   â€¢ Local file paths                â†’ Image.file
+  ///   â€¢ Video reports                   â†’ play-button overlay
   Widget _buildThumbnail(Report report) {
     if (report.isVideo) {
       return Container(
@@ -447,7 +457,6 @@ class _ReportTile extends StatelessWidget {
         errorWidget: (_, __, ___) => _iconBox(report.category),
       );
     }
-    // Local file path (e.g. camera capture before upload)
     try {
       final file = File(path);
       if (file.existsSync()) {

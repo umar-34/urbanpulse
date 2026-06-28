@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:provider/provider.dart';
@@ -8,8 +9,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'notifications_screen.dart';
 import '../providers/report_provider.dart';
-import 'create_report_screen.dart';
-import '../services/location_service.dart';
 import '../utils/snackbar_helper.dart';
 import '../services/media_service.dart';
 
@@ -31,19 +30,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
-  final _areaCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
-  final _address1Ctrl = TextEditingController();
-  final _streetCtrl = TextEditingController();
-  final _landmarkCtrl = TextEditingController();
   double? _latitude;
   double? _longitude;
-  String? _locationError;
   String _profileLocationLabel = '';
   final Set<String> _invalidFields = <String>{};
 
   Future<void> _editProfile() async {
-    // fetch latest user doc and seed controllers
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null) {
       try {
@@ -56,7 +49,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             FirebaseAuth.instance.currentUser?.email ??
             '';
       } catch (_) {
-        // ignore and fall back to existing values
         _nameCtrl.text = _name;
         _emailCtrl.text = _email;
       }
@@ -113,9 +105,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _nameCtrl, 'Full Name', Icons.person_outline_rounded),
                     const SizedBox(height: 16),
                     _sheetField(
-                        _phoneCtrl, 'Mobile Number', Icons.phone_outlined, keyboardType: TextInputType.phone),
+                        _phoneCtrl, 'Mobile Number', Icons.phone_outlined,
+                        keyboardType: TextInputType.phone),
                     const SizedBox(height: 16),
-                    // Email is read-only
                     TextField(
                       controller: _emailCtrl,
                       enabled: false,
@@ -161,8 +153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     strokeWidth: 2, color: Colors.white))
                             : const Text('Save Changes',
                                 style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700)),
+                                    fontSize: 16, fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ]),
@@ -267,7 +258,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final src = choice == 'camera' ? ImageSource.camera : ImageSource.gallery;
       final res = await MediaService.pickImage(source: src);
       if (res != null) {
-        // Save local path into user document so both screens update
         final uid = FirebaseAuth.instance.currentUser?.uid;
         if (uid != null) {
           await FirebaseFirestore.instance
@@ -280,7 +270,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (_) {}
   }
 
-  Widget _sheetField(TextEditingController ctrl, String label, IconData icon, {TextInputType? keyboardType}) {
+  Widget _sheetField(TextEditingController ctrl, String label, IconData icon,
+      {TextInputType? keyboardType}) {
     return TextField(
       controller: ctrl,
       keyboardType: keyboardType,
@@ -328,7 +319,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'UrbanPulse is an Intelligent Urban Reporting System that empowers '
           'citizens to report urban issues like potholes, garbage, broken '
           'streetlights, and water leaks directly to city authorities.\n\n'
-          'Built with Flutter • AI-Powered Verification',
+          'Built with Flutter · AI-Powered Verification',
           textAlign: TextAlign.justify,
           style: TextStyle(fontSize: 13, height: 1.6, color: Color(0xFF424242)),
         ),
@@ -398,16 +389,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () async {
               Navigator.pop(context); // close the dialog first
               try {
-                // 1. Clear Firestore offline persistence / cache
                 try {
-                  // This can throw 'failed-precondition' if there are active snapshot listeners.
                   await FirebaseFirestore.instance.terminate();
                   await FirebaseFirestore.instance.clearPersistence();
                 } catch (e) {
                   debugPrint('Firestore clear persistence error: $e');
                 }
 
-                // 2. Clear Google Sign-In session to force account picker next time
                 try {
                   final googleSignIn = GoogleSignIn();
                   if (await googleSignIn.isSignedIn()) {
@@ -418,7 +406,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   debugPrint('Google Sign-In disconnect error: $e');
                 }
 
-                // 3. Clear any local SharedPreferences login flags
                 try {
                   final prefs = await SharedPreferences.getInstance();
                   if (prefs.containsKey('isLoggedIn')) {
@@ -428,10 +415,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   debugPrint('SharedPreferences error: $e');
                 }
 
-                // 4. Sign out of Firebase Authentication
                 await FirebaseAuth.instance.signOut();
 
-                // 5. Navigate to Welcome Screen and clear the entire navigation stack
                 if (mounted) {
                   Navigator.of(context).pushNamedAndRemoveUntil(
                       '/welcome', (Route<dynamic> route) => false);
@@ -454,11 +439,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
-    _address1Ctrl.dispose();
-    _streetCtrl.dispose();
-    _areaCtrl.dispose();
     _cityCtrl.dispose();
-    _landmarkCtrl.dispose();
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
@@ -522,15 +503,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadSavedLocation() async {
-    // Load basic cached prefs if present, but prefer Firestore as source-of-truth.
     final prefs = await SharedPreferences.getInstance();
     final city = prefs.getString('profile_city') ?? '';
-    final area = prefs.getString('profile_area') ?? '';
     final lat = prefs.getDouble('profile_lat');
     final lon = prefs.getDouble('profile_lon');
     final img = prefs.getString('profile_image');
     setState(() {
-      if (area.isNotEmpty) _areaCtrl.text = area;
       if (city.isNotEmpty) _cityCtrl.text = city;
       if (lat != null) _latitude = lat;
       if (lon != null) _longitude = lon;
@@ -556,8 +534,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               bottom: media.viewInsets.bottom + 20),
           child: StatefulBuilder(builder: (context, setState) {
             bool _isSaving = false;
-            String? _selectedCity;
-            final outerSetState = setState;
 
             return Container(
               height: media.size.height * 0.45,
@@ -579,167 +555,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style:
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: () async {
-                      final selected = await Navigator.of(ctx).push<String>(
-                        MaterialPageRoute(builder: (cctx) {
-                          final TextEditingController searchCtrl =
-                              TextEditingController();
-                          final media = MediaQuery.of(cctx);
-                          return Scaffold(
-                            appBar: AppBar(
-                              title: const Text('Search City'),
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFF1A1A2E),
-                              elevation: 1,
-                            ),
-                            body: Padding(
-                              padding: EdgeInsets.only(
-                                  left: 16,
-                                  right: 16,
-                                  top: 12,
-                                  bottom: media.viewInsets.bottom + 12),
-                              child: Column(
-                                children: [
-                                  Container(
-                                    height: 6,
-                                    width: 60,
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[300],
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Expanded(
-                                    child: StatefulBuilder(
-                                        builder: (context2, innerSetState) {
-                                      // initialize filtered on first build and allow searching
-                                      List<String> currentFiltered = List.from(
-                                          PUNJAB_CITIES.where((c) => c
-                                              .toLowerCase()
-                                              .contains(searchCtrl.text
-                                                  .trim()
-                                                  .toLowerCase())));
-                                      return Column(
-                                        children: [
-                                          TextField(
-                                            controller: searchCtrl,
-                                            autofocus: true,
-                                            decoration: const InputDecoration(
-                                              hintText: 'Type to search...',
-                                              border: OutlineInputBorder(),
-                                              isDense: true,
-                                            ),
-                                            onChanged: (q) {
-                                              innerSetState(() {});
-                                            },
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Expanded(
-                                            child: ListView.separated(
-                                              itemCount: currentFiltered.length,
-                                              separatorBuilder: (_, __) =>
-                                                  const Divider(height: 1),
-                                              itemBuilder: (context, i) {
-                                                final city = currentFiltered[i];
-                                                final isSelected =
-                                                    city == _selectedCity;
-                                                return ListTile(
-                                                  title: Text(
-                                                    city,
-                                                    style: TextStyle(
-                                                        color: isSelected
-                                                            ? Theme.of(context)
-                                                                .primaryColor
-                                                            : null,
-                                                        fontWeight: isSelected
-                                                            ? FontWeight.w600
-                                                            : null),
-                                                  ),
-                                                  trailing: isSelected
-                                                      ? Icon(Icons.check,
-                                                          color:
-                                                              Theme.of(context)
-                                                                  .primaryColor)
-                                                      : null,
-                                                  onTap: () {
-                                                    Navigator.pop(cctx, city);
-                                                  },
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                          // react to text changes
-                                          Builder(builder: (_) {
-                                            searchCtrl.addListener(() {
-                                              innerSetState(() {});
-                                            });
-                                            return const SizedBox.shrink();
-                                          }),
-                                        ],
-                                      );
-                                    }),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }),
-                      );
-
-                      if (selected != null) {
-                        outerSetState(() {
-                          _selectedCity = selected;
-                          _cityCtrl.text = selected;
-                        });
+                  TextField(
+                    controller: _cityCtrl,
+                    onChanged: (v) {
+                      if (v.trim().isNotEmpty &&
+                          _invalidFields.remove('city')) {
+                        setState(() {});
                       }
                     },
-                    child: AbsorbPointer(
-                      child: TextField(
-                        controller: _cityCtrl,
-                        onChanged: (v) {
-                          if (v.trim().isNotEmpty &&
-                              _invalidFields.remove('city')) {
-                            setState(() {});
-                          }
-                        },
-                        decoration: InputDecoration(
-                          labelText: 'City *',
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                          errorText: _invalidFields.contains('city')
-                              ? 'Required'
-                              : null,
-                          suffixIcon:
-                              const Icon(Icons.keyboard_arrow_down_rounded),
-                          enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(
-                              color: _invalidFields.contains('city')
-                                  ? const Color(0xFFB71C1C)
-                                  : const Color(0xFFE0E0E0),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(
-                              color: _invalidFields.contains('city')
-                                  ? const Color(0xFFB71C1C)
-                                  : const Color(0xFF064554),
-                              width: 1.5,
-                            ),
-                          ),
+                    decoration: InputDecoration(
+                      labelText: 'City *',
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                      errorText: _invalidFields.contains('city')
+                          ? 'Required'
+                          : null,
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: _invalidFields.contains('city')
+                              ? const Color(0xFFB71C1C)
+                              : const Color(0xFFE0E0E0),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: _invalidFields.contains('city')
+                              ? const Color(0xFFB71C1C)
+                              : const Color(0xFF064554),
+                          width: 1.5,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  // Auto-location removed per UI requirement.
-                  if (_locationError != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Text(_locationError!,
-                          style: const TextStyle(color: Color(0xFFE53935))),
-                    ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -760,15 +607,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           onPressed: _isSaving
                               ? null
                               : () async {
-                                  final streetVal = _streetCtrl.text.trim();
                                   final cityVal = _cityCtrl.text.trim();
-                                  _invalidFields.remove('street');
                                   _invalidFields.remove('city');
-                                  if (streetVal.isEmpty || cityVal.isEmpty) {
-                                    if (streetVal.isEmpty)
-                                      _invalidFields.add('street');
-                                    if (cityVal.isEmpty)
-                                      _invalidFields.add('city');
+                                  if (cityVal.isEmpty) {
+                                    _invalidFields.add('city');
                                     setState(() {});
                                     return;
                                   }
@@ -778,14 +620,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   try {
                                     final prefs =
                                         await SharedPreferences.getInstance();
-                                    final existingStreet =
-                                        prefs.getString('profile_street') ?? '';
                                     final existingCity =
                                         prefs.getString('profile_city') ?? '';
                                     final wouldOverwrite =
-                                        (existingStreet.isNotEmpty &&
-                                                existingStreet != streetVal) ||
-                                            (existingCity.isNotEmpty &&
+                                        (existingCity.isNotEmpty &&
                                                 existingCity != cityVal);
                                     if (wouldOverwrite) {
                                       final confirm = await showDialog<bool>(
@@ -794,7 +632,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           title:
                                               const Text('Confirm overwrite'),
                                           content: const Text(
-                                              'You already have a saved Street/City. Do you want to overwrite it?'),
+                                              'You already have a saved City. Do you want to overwrite it?'),
                                           actions: [
                                             TextButton(
                                                 onPressed: () =>
@@ -814,13 +652,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       }
                                     }
 
-                                    final selected = _selectedCity ?? cityVal;
+                                    final selected = cityVal;
                                     await prefs.setString(
                                         'profile_city', selected);
-                                    await prefs.setString(
-                                        'profile_area', _areaCtrl.text.trim());
-                                    await prefs.setString(
-                                        'profile_street', streetVal);
                                     if (_latitude != null)
                                       await prefs.setDouble(
                                           'profile_lat', _latitude!);
@@ -837,27 +671,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           .set({
                                         'city': selected,
                                         'location': selected,
-                                        'area': _areaCtrl.text.trim(),
-                                        'street': streetVal,
                                         if (_latitude != null) 'lat': _latitude,
                                         if (_longitude != null)
                                           'lon': _longitude,
                                       }, SetOptions(merge: true));
                                     }
 
-                                    // Update local label and stop spinner before closing
                                     setState(() {
-                                      if (streetVal.isNotEmpty &&
-                                          cityVal.isNotEmpty) {
-                                        _profileLocationLabel =
-                                            '$streetVal, $cityVal';
-                                      } else if (_areaCtrl.text
-                                              .trim()
-                                              .isNotEmpty &&
-                                          cityVal.isNotEmpty) {
-                                        _profileLocationLabel =
-                                            '${_areaCtrl.text.trim()}, $cityVal';
-                                      } else if (cityVal.isNotEmpty) {
+                                      if (cityVal.isNotEmpty) {
                                         _profileLocationLabel = cityVal;
                                       } else {
                                         _profileLocationLabel = '';
@@ -868,12 +689,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     // Auto-close the bottom sheet and show success feedback
                                     if (mounted) {
                                       Navigator.pop(context);
-                                      SnackBarHelper.showSuccess(context, 'Location updated successfully.');
+                                      SnackBarHelper.showSuccess(context,
+                                          'Location updated successfully.');
                                     }
                                   } catch (e) {
                                     if (mounted) {
                                       setState(() => _isSaving = false);
-                                      SnackBarHelper.showError(context, 'Failed to update location: $e');
+                                      SnackBarHelper.showError(context,
+                                          'Failed to update location: $e');
                                     }
                                   }
                                 },
@@ -907,11 +730,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Consumer<ReportProvider>(
       builder: (context, provider, _) {
-        // Compute points: 5 per report, +10 bonus per resolved
         final points = provider.totalCount * 5 + provider.resolvedCount * 10;
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF0F4FF),
+          backgroundColor: const Color(0xFFF0F7F8),
           appBar: AppBar(
             flexibleSpace: Container(
               decoration: const BoxDecoration(
@@ -987,7 +809,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF064554).withOpacity(0.1),
+                                      color: const Color(0xFF064554)
+                                          .withOpacity(0.1),
                                       blurRadius: 12,
                                       offset: const Offset(0, 4),
                                     ),
@@ -1049,7 +872,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               child: CircularProgressIndicator());
                         }
                         if (!snap.hasData || !(snap.data?.exists ?? false)) {
-                          // fallback to local values
                           return Column(
                             children: [
                               Text(_name.isNotEmpty ? _name : 'User',
@@ -1171,7 +993,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    // Contribution bar (computed from Firestore reports)
                     StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                       stream: FirebaseAuth.instance.currentUser == null
                           ? const Stream.empty()
@@ -1211,7 +1032,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 16),
 
-              // ── Account ───────────────────────────────────────────────────
               _section('Account', [
                 _tile(Icons.person_outline_rounded, 'Edit Profile',
                     const Color(0xFF064554), _editProfile),
@@ -1220,16 +1040,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     'Notifications',
                     const Color(0xFF9C27B0),
                     () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const NotificationsScreen(),
-                      ),
-                    )),
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationsScreen(),
+                          ),
+                        )),
               ]),
 
               const SizedBox(height: 12),
 
-              // ── My Activity ───────────────────────────────────────────────
               _section('My Activity', [
                 _tile(
                     Icons.bar_chart_rounded,
@@ -1245,7 +1064,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 12),
 
-              // ── Preferences ───────────────────────────────────────────────
               _section('Preferences', [
                 _tile(Icons.help_outline_rounded, 'Help & Support',
                     const Color(0xFF43A047), () => _showHelp()),
@@ -1253,7 +1071,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 12),
 
-              // ── About ─────────────────────────────────────────────────────
               _section('About', [
                 _tile(Icons.info_outline_rounded, 'About UrbanPulse',
                     const Color(0xFF064554), _showAbout),
@@ -1263,27 +1080,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 12),
 
-              // ── Logout ────────────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _confirmLogout,
-                    icon: const Icon(Icons.logout_rounded,
-                        color: Color(0xFFE53935), size: 22),
-                    label: const Text('Log Out',
-                        style: TextStyle(
-                            color: Color(0xFFE53935),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFE53935).withOpacity(0.08),
-                      elevation: 0,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                    child: GestureDetector(
+                      onTap: _confirmLogout,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE53935).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFFE53935).withOpacity(0.22),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.07),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout_rounded,
+                                color: Color(0xFFE53935), size: 22),
+                            SizedBox(width: 10),
+                            Text(
+                              'Log Out',
+                              style: TextStyle(
+                                color: Color(0xFFE53935),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1294,42 +1133,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       },
-    );
-  }
-
-  Widget _contributionBar(ReportProvider p) {
-    final pct = p.totalCount == 0
-        ? 0.0
-        : (p.resolvedCount / p.totalCount).clamp(0.0, 1.0);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Resolution Rate',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF9E9E9E),
-                    fontWeight: FontWeight.w500)),
-            Text('${(pct * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF43A047),
-                    fontWeight: FontWeight.w700)),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: pct,
-            backgroundColor: const Color(0xFFE0E0E0),
-            color: const Color(0xFF43A047),
-            minHeight: 6,
-          ),
-        ),
-      ],
     );
   }
 
@@ -1424,10 +1227,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showComingSoon(String feature) {
-    SnackBarHelper.showInfo(context, '$feature — coming soon!');
-  }
-
   void _showHelp() {
     showDialog(
       context: context,
@@ -1471,7 +1270,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 4),
           Text(label,
               style: const TextStyle(
-                  fontSize: 12, 
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF78909C))),
         ],
@@ -1498,21 +1297,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: Color(0xFF90A4AE),
                       letterSpacing: 1.2)),
             ),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey.withOpacity(0.1)),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4))
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Column(children: items),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.62),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFF064554).withOpacity(0.14),
+                      width: 1.1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.07),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Column(children: items),
+                  ),
+                ),
               ),
             ),
           ],

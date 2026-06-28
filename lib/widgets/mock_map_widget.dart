@@ -33,17 +33,14 @@ class MockMapWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Stack(
           children: [
-            // Map base
             CustomPaint(
               size: Size(double.infinity, height),
               painter: _MapPainter(),
             ),
 
-            // Report pins (up to 6)
             ...reports.take(6).toList().asMap().entries.map((entry) {
               final idx = entry.key;
               final r = entry.value;
-              // Distribute pins across the map
               final positions = [
                 [0.22, 0.35],
                 [0.55, 0.25],
@@ -62,7 +59,6 @@ class MockMapWidget extends StatelessWidget {
               );
             }),
 
-            // Highlighted GPS location (red pulsing dot)
             if (highlightLat != null)
               Positioned(
                 left: 0,
@@ -74,7 +70,6 @@ class MockMapWidget extends StatelessWidget {
                 ),
               ),
 
-            // Attribution
             Positioned(
               bottom: 8,
               right: 10,
@@ -84,12 +79,11 @@ class MockMapWidget extends StatelessWidget {
                   color: Colors.white.withOpacity(0.85),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text('© UrbanPulse Map',
+                child: const Text('Â© UrbanPulse Map',
                     style: TextStyle(fontSize: 9, color: Color(0xFF757575))),
               ),
             ),
 
-            // Zoom controls
             const Positioned(
               right: 10,
               top: 10,
@@ -311,7 +305,6 @@ class _MapBtn extends StatelessWidget {
 class _MapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    // Background
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
       Paint()..color = const Color(0xFFE8F0E9),
@@ -328,7 +321,6 @@ class _MapPainter extends CustomPainter {
     final block = Paint()..color = const Color(0xFFD6E3D6);
     final park = Paint()..color = const Color(0xFFC8DFC8);
 
-    // Roads
     canvas.drawLine(Offset(0, size.height * 0.3),
         Offset(size.width, size.height * 0.3), road);
     canvas.drawLine(Offset(0, size.height * 0.6),
@@ -342,7 +334,6 @@ class _MapPainter extends CustomPainter {
     canvas.drawLine(Offset(size.width * 0.5, size.height * 0.3),
         Offset(size.width * 0.5, size.height), minor);
 
-    // Blocks
     for (final r in [
       Rect.fromLTWH(10, 10, size.width * 0.28, size.height * 0.25),
       Rect.fromLTWH(size.width * 0.42, 10, size.width * 0.2, size.height * 0.25),
@@ -357,7 +348,6 @@ class _MapPainter extends CustomPainter {
       canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(4)), block);
     }
 
-    // Park
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromLTWH(10, 10, size.width * 0.22, size.height * 0.18),

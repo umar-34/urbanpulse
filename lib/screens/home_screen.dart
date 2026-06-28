@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import '../models/report.dart';
-// Quick report grid will be shown inline below
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:shimmer/shimmer.dart';
@@ -70,7 +69,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       setState(() => _displayName = _email ?? 'Guest');
     } catch (e) {
-      // ignore errors and fallback to defaults
       setState(() => _displayName = _email ?? 'Guest');
     }
   }
@@ -86,7 +84,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        // Request permission interactively
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.denied ||
@@ -120,7 +117,6 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         }
       } catch (_) {
-        // ignore geocoding errors
       }
 
       if (!mounted) return;
@@ -140,7 +136,6 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: const Color(0xFFF5F7FA),
           body: CustomScrollView(
             slivers: [
-              // ── App Bar ──────────────────────────────────────────────────
               SliverAppBar(
                 flexibleSpace: Container(
                   decoration: const BoxDecoration(
@@ -156,7 +151,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 elevation: 0,
                 titleSpacing: 0,
                 automaticallyImplyLeading: false,
-                // increase toolbar height so header content has breathing room
                 toolbarHeight: 92,
                 title: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
@@ -428,7 +422,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Reports carousel (from Firestore)
                         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                             stream: FirebaseFirestore.instance
                                 .collection('reports')
@@ -447,10 +440,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 );
                               }
 
-                              // If we already have data, show it immediately.
                               if (snap.hasData) {
                                 final docs = snap.data!.docs;
-                                // Local filtering and sorting to bypass Firestore index errors
                                 var reports =
                                     docs.map((d) => _reportFromDoc(d)).toList();
 
@@ -486,7 +477,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 );
                               }
 
-                              // While waiting for initial data, show a loader. Do not override existing data.
                               if (snap.connectionState ==
                                       ConnectionState.waiting &&
                                   !snap.hasData) {
@@ -592,7 +582,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 );
                               }
 
-                              // Fallback: show empty state if we reach here with no data
                               return _buildEmptyState(context);
                             }),
                         const SizedBox(height: 24),
@@ -651,8 +640,6 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
-
-
 
   Report _reportFromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
@@ -876,7 +863,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Stack(
           children: [
-            // Number + label
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,

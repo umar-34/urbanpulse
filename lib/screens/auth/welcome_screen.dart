@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'auth_theme.dart';
 import 'sign_in_screen.dart';
 import 'sign_up_screen.dart';
@@ -21,11 +22,9 @@ class WelcomeScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // ── Decorative blobs ──────────────────────────────────────────
               Expanded(
                 child: Stack(
                   children: [
-                    // Background decorative circles (glassmorphism blobs)
                     Positioned(
                       top: -40,
                       right: -40,
@@ -62,62 +61,12 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // ── Hero content ─────────────────────────────────────────
                     Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           // Glowing logo container
-                          Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.12),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.white.withOpacity(0.18),
-                                  blurRadius: 32,
-                                  spreadRadius: 6,
-                                ),
-                              ],
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.25),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Container(
-                                  width: 92,
-                                  height: 92,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: Colors.white.withOpacity(0.4),
-                                        width: 2),
-                                  ),
-                                ),
-                                const Icon(Icons.location_city_rounded,
-                                    color: Colors.white, size: 44),
-                                Positioned(
-                                  bottom: 14,
-                                  right: 14,
-                                  child: Container(
-                                    width: 26,
-                                    height: 26,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF00BFA5),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.location_on,
-                                        color: Colors.white, size: 14),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          const _GlowingLogo(),
                           const SizedBox(height: 28),
                           RichText(
                             text: const TextSpan(
@@ -169,80 +118,175 @@ class WelcomeScreen extends StatelessWidget {
                 ),
               ),
 
-              // ── CTA card ─────────────────────────────────────────────────
-              Container(
-                margin: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.18),
-                      blurRadius: 36,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Get Started',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF062B36),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Join thousands of citizens making their city better',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                    ),
-                    const SizedBox(height: 24),
-                    // Sign In button — gradient
-                    GestureDetector(
-                      onTap: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const SignInScreen())),
-                      child: Container(
-                        height: 54,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          gradient: kThemeGradient,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: kPrimaryTeal.withOpacity(0.35),
-                              blurRadius: 14,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
+              // ── Get Started card ─────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                child: GlassAuthCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Get Started',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: Color.fromARGB(255, 255, 255, 255),
                         ),
-                        child: const Text(
-                          'Sign In',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Join thousands of citizens making their city better',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: Color.fromARGB(255, 255, 255, 255)),
+                      ),
+                      const SizedBox(height: 24),
+                      // Sign In button gradient
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const SignInScreen())),
+                        child: Container(
+                          height: 54,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            gradient: kThemeGradient,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: kPrimaryTeal.withOpacity(0.35),
+                                blurRadius: 14,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: const Text(
+                            'Sign In',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Create Account button — outlined teal
-                    OutlinedButton(
-                      style: outlinedGreenStyle(),
-                      onPressed: () => Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const SignUpScreen())),
-                      child: const Text('Create Account'),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      // Create Account button â€” outlined teal
+                      OutlinedButton(
+                        style: outlinedGreenStyle(),
+                        onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const SignUpScreen())),
+                        child: const Text('Create Account'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              )
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _GlowingLogo extends StatefulWidget {
+  const _GlowingLogo({Key? key}) : super(key: key);
+
+  @override
+  State<_GlowingLogo> createState() => _GlowingLogoState();
+}
+
+class _GlowingLogoState extends State<_GlowingLogo>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          width: 120,
+          height: 120,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.12),
+            shape: BoxShape.circle,
+            boxShadow: [
+              // Slowly rotating glow effect
+              BoxShadow(
+                color: const Color(0xFF00BFA5).withOpacity(0.5),
+                blurRadius: 36,
+                spreadRadius: 8,
+                offset: Offset(
+                  15 * math.cos(_controller.value * 2 * math.pi),
+                  15 * math.sin(_controller.value * 2 * math.pi),
+                ),
+              ),
+              // Base soft white glow
+              BoxShadow(
+                color: Colors.white.withOpacity(0.15),
+                blurRadius: 24,
+                spreadRadius: 2,
+              )
+            ],
+            border: Border.all(
+              color: Colors.white.withOpacity(0.25),
+              width: 1.5,
+            ),
+          ),
+          child: child,
+        );
+      },
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 92,
+            height: 92,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withOpacity(0.4),
+                width: 2,
+              ),
+            ),
+          ),
+          const Icon(Icons.location_city_rounded,
+              color: Colors.white, size: 44),
+          Positioned(
+            bottom: 14,
+            right: 14,
+            child: Container(
+              width: 26,
+              height: 26,
+              decoration: const BoxDecoration(
+                color: Color(0xFF00BFA5),
+                shape: BoxShape.circle,
+              ),
+              child:
+                  const Icon(Icons.location_on, color: Colors.white, size: 14),
+            ),
+          ),
+        ],
       ),
     );
   }

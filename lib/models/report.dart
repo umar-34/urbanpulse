@@ -173,7 +173,6 @@ class Report {
           if (raw.contains('active') || raw.contains('pending') || raw.contains('in progress') || raw.contains('assigned')) return ReportStatus.assignedToDept;
           if (raw.contains('ai') || raw.contains('verified')) return ReportStatus.aiVerified;
           if (raw.contains('received')) return ReportStatus.received;
-          // try match by enum name
           try {
             return ReportStatus.values.firstWhere((e) => e.name.toLowerCase() == raw);
           } catch (_) {
@@ -191,5 +190,3 @@ class Report {
             [],
       );
 }
-
-

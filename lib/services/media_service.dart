@@ -11,7 +11,6 @@ class MediaResult {
 class MediaService {
   static final _picker = ImagePicker();
 
-  /// Show a bottom-sheet style source picker and return the chosen media.
   static Future<MediaResult?> pickImage({required ImageSource source}) async {
     final xFile = await _picker.pickImage(
       source: source,

@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -28,35 +29,9 @@ Future<void> main() async {
     ),
   );
 
-  // ─── App Startup Profile Check ───────────────────────────────────────────
-  // If the user closed the app without completing their profile, log them out
-  // so they are routed back to the Welcome Screen instead of entering the app.
-  final user = FirebaseAuth.instance.currentUser;
-  if (user != null) {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      final data = doc.data();
-      final phone = data?['phoneNumber'] as String?;
-      final city = data?['city'] as String?;
-
-      if (phone == null || phone.isEmpty || city == null || city.isEmpty) {
-        await FirebaseAuth.instance.signOut();
-        try {
-          await GoogleSignIn().signOut();
-        } catch (_) {}
-      }
-    } catch (_) {
-      // Ignore network errors to prevent hanging the app on startup
-    }
-  }
-  // ─────────────────────────────────────────────────────────────────────────
-
   runApp(
     ChangeNotifierProvider(
-      create: (_) => ReportProvider()..load(),
+      create: (_) => ReportProvider(),
       child: const UrbanPulseApp(),
     ),
   );
@@ -130,23 +105,11 @@ class UrbanPulseApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: Color(0xFF064554), width: 2),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       ),
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-          if (snapshot.hasData) {
-            return const MainNavigation();
-          }
-          return const WelcomeScreen();
-        },
-      ),
+      home: const SplashScreen(),
       routes: {
         '/splash': (_) => const SplashScreen(),
         '/welcome': (_) => const WelcomeScreen(),
@@ -170,8 +133,17 @@ class MainNavigation extends StatefulWidget {
   State<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
+class _MainNavigationState extends State<MainNavigation>
+    with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
+  late AnimationController _capsuleCtrl;
+  late Animation<double> _capsuleAnim;
+
+  static const _navItems = [
+    _NavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
+    _NavItem(Icons.description_outlined, Icons.description_rounded, 'Reports'),
+    _NavItem(Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
+  ];
 
   final List<Widget> _screens = const [
     HomeScreen(),
@@ -180,70 +152,193 @@ class _MainNavigationState extends State<MainNavigation> {
   ];
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.10),
-              blurRadius: 24,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: SizedBox(
-            height: 64,
-            child: Row(
-              children: [
-                _buildNavItem(0, Icons.home_outlined, Icons.home_rounded, 'Home'),
-                _buildNavItem(1, Icons.description_outlined, Icons.description_rounded, 'My Reports'),
-                _buildNavItem(2, Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
-              ],
-            ),
-          ),
-        ),
-      ),
+  void initState() {
+    super.initState();
+    _capsuleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+    _capsuleAnim = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _capsuleCtrl, curve: Curves.easeInOutCubic),
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, IconData activeIcon, String label) {
-    final isSelected = _currentIndex == index;
-    const primary = Color(0xFF064554);
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _currentIndex = index),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+  @override
+  void dispose() {
+    _capsuleCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onTabTap(int index) {
+    if (index == _currentIndex) return;
+    final oldIndex = _currentIndex;
+    setState(() => _currentIndex = index);
+    _capsuleAnim = Tween<double>(
+      begin: oldIndex.toDouble(),
+      end: index.toDouble(),
+    ).animate(
+      CurvedAnimation(parent: _capsuleCtrl, curve: Curves.easeInOutCubic),
+    );
+    _capsuleCtrl
+      ..reset()
+      ..forward();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBody: true, // body goes behind the floating bar
+      body: _screens[_currentIndex],
+      bottomNavigationBar: _GlassNavBar(
+        currentIndex: _currentIndex,
+        capsuleAnim: _capsuleAnim,
+        navItems: _navItems,
+        onTap: _onTabTap,
+      ),
+    );
+  }
+}
+
+class _NavItem {
+  final IconData outlineIcon;
+  final IconData filledIcon;
+  final String label;
+  const _NavItem(this.outlineIcon, this.filledIcon, this.label);
+}
+
+class _GlassNavBar extends StatelessWidget {
+  final int currentIndex;
+  final Animation<double> capsuleAnim;
+  final List<_NavItem> navItems;
+  final ValueChanged<int> onTap;
+
+  const _GlassNavBar({
+    required this.currentIndex,
+    required this.capsuleAnim,
+    required this.navItems,
+    required this.onTap,
+  });
+
+  static const _primary = Color(0xFF064554);
+  static const _barHeight = 64.0;
+  static const _hPad = 20.0; // horizontal page margin
+  static const _vPad = 16.0; // distance above system nav
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final totalHeight = _barHeight + _vPad + bottomInset;
+
+    return SizedBox(
+      height: totalHeight,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: _hPad,
+          right: _hPad,
+          bottom: _vPad + bottomInset,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(50),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              height: _barHeight,
               decoration: BoxDecoration(
-                color: isSelected ? primary.withOpacity(0.12) : Colors.transparent,
-                borderRadius: BorderRadius.circular(24),
+                color: Colors.white.withOpacity(0.62),
+                borderRadius: BorderRadius.circular(50),
+                border: Border.all(
+                  color: _primary.withOpacity(0.25),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 24,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              child: Icon(
-                isSelected ? activeIcon : icon,
-                color: isSelected ? primary : const Color(0xFF94A3B8),
-                size: 24,
-              ),
+              child: LayoutBuilder(builder: (context, constraints) {
+                final itemWidth = constraints.maxWidth / navItems.length;
+                return AnimatedBuilder(
+                  animation: capsuleAnim,
+                  builder: (context, child) {
+                    final capsuleLeft = capsuleAnim.value * itemWidth + 6;
+                    return Stack(
+                      alignment: Alignment.centerLeft,
+                      children: [
+                        Positioned(
+                          left: capsuleLeft,
+                          child: Container(
+                            width: itemWidth - 12,
+                            height: _barHeight - 16,
+                            decoration: BoxDecoration(
+                              color: _primary.withOpacity(0.10),
+                              borderRadius: BorderRadius.circular(40),
+                              border: Border.all(
+                                color: _primary.withOpacity(0.22),
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Row(
+                          children: List.generate(navItems.length, (i) {
+                            final item = navItems[i];
+                            final isActive = currentIndex == i;
+                            return Expanded(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => onTap(i),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    AnimatedSwitcher(
+                                      duration:
+                                          const Duration(milliseconds: 220),
+                                      transitionBuilder: (child, anim) =>
+                                          ScaleTransition(
+                                              scale: anim, child: child),
+                                      child: Icon(
+                                        isActive
+                                            ? item.filledIcon
+                                            : item.outlineIcon,
+                                        key: ValueKey(isActive),
+                                        color: isActive
+                                            ? _primary
+                                            : _primary.withOpacity(0.38),
+                                        size: 22,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    AnimatedDefaultTextStyle(
+                                      duration:
+                                          const Duration(milliseconds: 220),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: isActive
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        color: isActive
+                                            ? _primary
+                                            : _primary.withOpacity(0.38),
+                                        letterSpacing: 0.2,
+                                      ),
+                                      child: Text(item.label),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              }),
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? primary : const Color(0xFF94A3B8),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

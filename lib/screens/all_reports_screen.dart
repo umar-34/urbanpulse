@@ -1,8 +1,8 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-// provider and report_provider no longer needed; using Firestore stream
 import '../models/report.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/report_card.dart';
@@ -99,7 +99,7 @@ class _AllReportsScreenState extends State<AllReportsScreen> {
                     onChanged: (v) => setState(() => _search = v),
                     style: const TextStyle(fontSize: 14),
                     decoration: InputDecoration(
-                      hintText: 'Search reports…',
+                      hintText: 'Search reportsâ€¦',
                       hintStyle: const TextStyle(color: Color(0xFFBDBDBD)),
                       prefixIcon: const Icon(Icons.search_rounded,
                           color: Color(0xFF9E9E9E), size: 20),
@@ -176,7 +176,6 @@ class _AllReportsScreenState extends State<AllReportsScreen> {
           );
         }).toList();
         
-        // Local sort (newest first) replaces Firestore orderBy to prevent index errors
         reports.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
         final filtered = _applyFilters(reports);
@@ -210,7 +209,6 @@ class _AllReportsScreenState extends State<AllReportsScreen> {
           ),
           body: Column(
             children: [
-              // Search bar
               Container(
                 color: Colors.white,
                 padding:
@@ -220,7 +218,7 @@ class _AllReportsScreenState extends State<AllReportsScreen> {
                   onChanged: (v) => setState(() => _search = v),
                   style: const TextStyle(fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: 'Search reports…',
+                    hintText: 'Search reportsâ€¦',
                     hintStyle: const TextStyle(color: Color(0xFFBDBDBD)),
                     prefixIcon: const Icon(Icons.search_rounded,
                         color: Color(0xFF9E9E9E), size: 20),
@@ -245,7 +243,6 @@ class _AllReportsScreenState extends State<AllReportsScreen> {
                 ),
               ),
 
-              // Filter chips
               Container(
                 color: Colors.white,
                 child: SingleChildScrollView(
@@ -281,7 +278,6 @@ class _AllReportsScreenState extends State<AllReportsScreen> {
                 ),
               ),
 
-              // Count
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
                 child: Row(
@@ -391,94 +387,102 @@ class _ReportListTile extends StatelessWidget {
         '/report-detail',
         arguments: report.id,
       ),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.withOpacity(0.15)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Thumbnail
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: report.mediaPath != null
-                  ? Image.file(
-                      File(report.mediaPath!),
-                      width: 64,
-                      height: 64,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _iconBox(report.category),
-                    )
-                  : _iconBox(report.category),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    report.title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A2E),
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on_rounded,
-                          size: 14, color: Color(0xFF78909C)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          report.location,
-                          style: const TextStyle(
-                              fontSize: 13, color: Color(0xFF78909C), fontWeight: FontWeight.w500),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  StatusBadge(
-                      status: report.status, rawLabel: report.rawStatus, compact: true),
-                ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.62),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFF064554).withOpacity(0.14),
+                width: 1.1,
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  _formatDate(report.createdAt),
-                  style:
-                      const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF90A4AE)),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF0F7F8),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.arrow_forward_ios_rounded,
-                      color: Color(0xFF064554), size: 14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-          ],
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: report.mediaPath != null
+                      ? Image.file(
+                          File(report.mediaPath!),
+                          width: 64,
+                          height: 64,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _iconBox(report.category),
+                        )
+                      : _iconBox(report.category),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        report.title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1A2E),
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_rounded,
+                              size: 14, color: Color(0xFF78909C)),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              report.location,
+                              style: const TextStyle(
+                                  fontSize: 13, color: Color(0xFF78909C), fontWeight: FontWeight.w500),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      StatusBadge(
+                          status: report.status, rawLabel: report.rawStatus, compact: true),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _formatDate(report.createdAt),
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF90A4AE)),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF064554).withOpacity(0.10),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.arrow_forward_ios_rounded,
+                          color: Color(0xFF064554), size: 14),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

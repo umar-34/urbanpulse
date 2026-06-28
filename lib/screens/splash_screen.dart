@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../providers/report_provider.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -33,15 +36,49 @@ class _SplashScreenState extends State<SplashScreen>
 
     _ctrl.forward();
 
-    // Load data then navigate after at least 2.5 seconds
-    Future.wait([
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    final futures = <Future>[
       context.read<ReportProvider>().load(),
       Future.delayed(const Duration(milliseconds: 2500)),
-    ]).then((_) {
-      if (mounted) {
+    ];
+
+    final user = FirebaseAuth.instance.currentUser;
+    bool needsProfileCompletion = false;
+
+    if (user != null) {
+      futures.add(
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get()
+            .then((doc) async {
+          final data = doc.data();
+          final phone = data?['phoneNumber'] as String?;
+          final city = data?['city'] as String?;
+
+          if (phone == null || phone.isEmpty || city == null || city.isEmpty) {
+            await FirebaseAuth.instance.signOut();
+            try {
+              await GoogleSignIn().signOut();
+            } catch (_) {}
+            needsProfileCompletion = true;
+          }
+        }).catchError((_) {}),
+      );
+    }
+
+    await Future.wait(futures);
+
+    if (mounted) {
+      if (user == null || needsProfileCompletion) {
+        Navigator.pushReplacementNamed(context, '/welcome');
+      } else {
         Navigator.pushReplacementNamed(context, '/home');
       }
-    });
+    }
   }
 
   @override
@@ -69,66 +106,10 @@ class _SplashScreenState extends State<SplashScreen>
                     child: Center(
                       child: Column(
                         children: [
-                          // Logo mark
-                          Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF064554).withOpacity(0.07),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Container(
-                                  width: 82,
-                                  height: 82,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: const Color(0xFF064554),
-                                        width: 2.5),
-                                  ),
-                                ),
-                                const Icon(Icons.location_city_rounded,
-                                    color: Color(0xFF064554), size: 38),
-                                Positioned(
-                                  bottom: 10,
-                                  right: 10,
-                                  child: Container(
-                                    width: 22,
-                                    height: 22,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF43A047),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.location_on,
-                                        color: Colors.white, size: 13),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 28),
-                          RichText(
-                            text: const TextSpan(children: [
-                              TextSpan(
-                                text: 'Urban',
-                                style: TextStyle(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF064554),
-                                    letterSpacing: -0.5),
-                              ),
-                              TextSpan(
-                                text: 'Pulse',
-                                style: TextStyle(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF43A047),
-                                    letterSpacing: -0.5),
-                              ),
-                            ]),
+                          Image.asset(
+                            'assets/images/urbanPulse.png',
+                            height: 160,
+                            fit: BoxFit.contain,
                           ),
                           const SizedBox(height: 8),
                           const Text(

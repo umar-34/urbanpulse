@@ -1,20 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Centralized service for updating a report's status and writing
-/// a paired notification to the [notifications] collection atomically.
-///
-/// Call this anywhere in the app where you advance a report's status.
 class NotificationService {
   static final _db = FirebaseFirestore.instance;
 
-  /// Updates [status] on the given report document and immediately writes a
-  /// corresponding notification for the report owner.
-  ///
-  /// - [reportId]     Firestore document ID of the report.
-  /// - [reportOwnerId] UID of the citizen who created the report.
-  /// - [reportTitle]  Human-readable title of the report (for the notification body).
-  /// - [newStatus]    The new status string (e.g. "AI Verified", "Assigned to Department", "Resolved").
-  /// - [extraFields]  Any additional fields to merge into the report document (optional).
   static Future<void> updateReportStatus({
     required String reportId,
     required String reportOwnerId,
@@ -24,7 +12,6 @@ class NotificationService {
   }) async {
     final batch = _db.batch();
 
-    // ── 1. Update the report document ────────────────────────────────────────
     final reportRef = _db.collection('reports').doc(reportId);
     batch.update(reportRef, {
       'status': newStatus,
@@ -32,7 +19,6 @@ class NotificationService {
       ...?extraFields,
     });
 
-    // ── 2. Write the paired notification ─────────────────────────────────────
     final notifRef = _db.collection('notifications').doc();
     batch.set(notifRef, {
       'userId': reportOwnerId,
@@ -46,8 +32,6 @@ class NotificationService {
     await batch.commit();
   }
 
-  /// Convenience overload: writes a notification with a custom title and body
-  /// without necessarily changing the status field (e.g. "Report Received" on submit).
   static Future<void> sendNotification({
     required String userId,
     required String title,

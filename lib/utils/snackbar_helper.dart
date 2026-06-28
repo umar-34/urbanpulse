@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 /// Centralised helper for displaying modern, floating SnackBars
-/// throughout the UrbanPulse application.
 class SnackBarHelper {
   SnackBarHelper._(); // prevent instantiation
 
@@ -23,35 +22,34 @@ class SnackBarHelper {
   }
 
   static void _show(BuildContext context, {required String message, required Color backgroundColor, required IconData icon}) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          duration: _kDuration,
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: backgroundColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          content: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Icon(icon, color: Colors.white, size: 22),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  message,
-                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600, height: 1.4),
-                ),
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        duration: _kDuration,
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: backgroundColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        content: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600, height: 1.4),
               ),
-            ],
-          ),
-          action: SnackBarAction(
-            label: 'x',
-            textColor: Colors.white70,
-            onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
-          ),
+            ),
+            GestureDetector(
+              onTap: () => messenger.hideCurrentSnackBar(),
+              child: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
+            ),
+          ],
         ),
-      );
+      ),
+    );
   }
 }

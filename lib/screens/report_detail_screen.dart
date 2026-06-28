@@ -27,13 +27,11 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   Widget build(BuildContext context) {
     final arg = ModalRoute.of(context)?.settings.arguments;
 
-    // If a Report object was passed directly, render immediately.
     if (arg is Report) return _scaffoldForReport(arg);
 
     final reportId = arg as String?;
 
     if (reportId == null) {
-      // Fallback: try provider
       return Consumer<ReportProvider>(builder: (context, provider, _) {
         final r = provider.reports.isNotEmpty ? provider.reports.first : null;
         if (r == null) return _notFoundScaffold();
@@ -43,12 +41,17 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
 
     // Listen to Firestore document for live updates
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('reports').doc(reportId).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('reports')
+          .doc(reportId)
+          .snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
         }
-        if (!snap.hasData || !(snap.data?.exists ?? false)) return _notFoundScaffold();
+        if (!snap.hasData || !(snap.data?.exists ?? false))
+          return _notFoundScaffold();
         final report = _reportFromDoc(snap.data!);
         return _scaffoldForReport(report);
       },
@@ -95,21 +98,17 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           actions: [
             Builder(
               builder: (BuildContext innerContext) {
-                // ── Deletion gate: only Received / AI-Verified reports can be cancelled ──
                 final canDelete = report.status == ReportStatus.received ||
                     report.status == ReportStatus.aiVerified ||
                     report.status == ReportStatus.rejected;
 
                 return Tooltip(
-                  message: canDelete
-                      ? 'Delete report'
-                      : 'Cannot delete — work has already begun',
+                  message: canDelete ? 'Delete report' : 'Cannot Delete',
                   child: IconButton(
                     icon: Icon(
                       Icons.delete_outline_rounded,
-                      color: canDelete
-                          ? const Color(0xFFE53935)
-                          : Colors.white38,
+                      color:
+                          canDelete ? const Color(0xFFE53935) : Colors.white38,
                     ),
                     onPressed: canDelete
                         ? () => _confirmAndDelete(context, report.id)
@@ -125,41 +124,119 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [const Text('Status Timeline', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E))), const Spacer(), StatusBadge(status: report.status, rawLabel: report.rawStatus),]),
-                const SizedBox(height: 16),
-                _buildTimeline(report),
-              ])),
+              _card(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Row(children: [
+                      const Text('Status Timeline',
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1A1A2E))),
+                      const Spacer(),
+                      StatusBadge(
+                          status: report.status, rawLabel: report.rawStatus),
+                    ]),
+                    const SizedBox(height: 16),
+                    _buildTimeline(report),
+                  ])),
 
               const SizedBox(height: 16),
-              _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Report Evidence', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E))),
-                const SizedBox(height: 12),
-                ClipRRect(borderRadius: BorderRadius.circular(12), child: report.mediaPath != null ? (report.isVideo ? Container(height: 160, color: const Color(0xFF263238), child: const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 48), SizedBox(height: 6), Text('Video evidence', style: TextStyle(color: Colors.white70, fontSize: 13)),],),),) : _mediaWidget(report.mediaPath!)) : _placeholderMedia()),
-              ])),
+              _card(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    const Text('Report Evidence',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1A1A2E))),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: report.mediaPath != null
+                            ? (report.isVideo
+                                ? Container(
+                                    height: 160,
+                                    color: const Color(0xFF263238),
+                                    child: const Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.play_circle_fill_rounded,
+                                              color: Colors.white, size: 48),
+                                          SizedBox(height: 6),
+                                          Text('Video evidence',
+                                              style: TextStyle(
+                                                  color: Colors.white70,
+                                                  fontSize: 13)),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                : _mediaWidget(report.mediaPath!))
+                            : _placeholderMedia()),
+                  ])),
 
               const SizedBox(height: 16),
-              _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Report Details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E))),
-                const SizedBox(height: 16),
-                _detailRow(icon: Icons.category_outlined, label: 'Issue Category', value: report.category.label, iconColor: const Color(0xFF064554)),
-                const SizedBox(height: 14),
-                _detailRow(icon: Icons.location_on_outlined, label: 'Location', value: report.location, iconColor: const Color(0xFFE53935)),
-                if (report.latitude != null) ...[
-                  const SizedBox(height: 4),
-                  Padding(padding: const EdgeInsets.only(left: 48), child: Text('GPS: ${report.latitude!.toStringAsFixed(5)}, ${report.longitude!.toStringAsFixed(5)}', style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E)),),),
-                ],
-                if (report.description != null) ...[
-                  const SizedBox(height: 14),
-                  _detailRow(icon: Icons.description_outlined, label: 'Description', value: report.description!, iconColor: const Color(0xFF9E9E9E)),
-                ],
-                const SizedBox(height: 14),
-                _detailRow(icon: Icons.calendar_today_outlined, label: 'Submitted', value: _formatDateTime(report.createdAt), iconColor: const Color(0xFF9E9E9E)),
-                const SizedBox(height: 16),
-                ClipRRect(borderRadius: BorderRadius.circular(10), child: MockMapWidget(height: 130, highlightLat: report.latitude, highlightLon: report.longitude)),
-              ])),
+              _card(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    const Text('Report Details',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1A1A2E))),
+                    const SizedBox(height: 16),
+                    _detailRow(
+                        icon: Icons.category_outlined,
+                        label: 'Issue Category',
+                        value: report.category.label,
+                        iconColor: const Color(0xFF064554)),
+                    const SizedBox(height: 14),
+                    _detailRow(
+                        icon: Icons.location_on_outlined,
+                        label: 'Location',
+                        value: report.location,
+                        iconColor: const Color(0xFFE53935)),
+                    if (report.latitude != null) ...[
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 48),
+                        child: Text(
+                          'GPS: ${report.latitude!.toStringAsFixed(5)}, ${report.longitude!.toStringAsFixed(5)}',
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF9E9E9E)),
+                        ),
+                      ),
+                    ],
+                    if (report.description != null) ...[
+                      const SizedBox(height: 14),
+                      _detailRow(
+                          icon: Icons.description_outlined,
+                          label: 'Description',
+                          value: report.description!,
+                          iconColor: const Color(0xFF9E9E9E)),
+                    ],
+                    const SizedBox(height: 14),
+                    _detailRow(
+                        icon: Icons.calendar_today_outlined,
+                        label: 'Submitted',
+                        value: _formatDateTime(report.createdAt),
+                        iconColor: const Color(0xFF9E9E9E)),
+                    const SizedBox(height: 16),
+                    ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: MockMapWidget(
+                            height: 130,
+                            highlightLat: report.latitude,
+                            highlightLon: report.longitude)),
+                  ])),
 
-                const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               // ── Delete button ────────────────────────────────────────────────
               Builder(builder: (ctx) {
@@ -175,16 +252,17 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     child: ElevatedButton.icon(
                       icon: Icon(
                         Icons.delete_outline_rounded,
-                        color: canDelete ? Colors.white : const Color(0xFF9E9E9E),
+                        color:
+                            canDelete ? Colors.white : const Color(0xFF9E9E9E),
                       ),
                       label: Text(
-                        canDelete
-                            ? 'Delete Report'
-                            : 'Cannot Delete — Work Has Begun',
+                        canDelete ? 'Delete Report' : 'Cannot Delete',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: canDelete ? Colors.white : const Color(0xFF9E9E9E),
+                          color: canDelete
+                              ? Colors.white
+                              : const Color(0xFF9E9E9E),
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
@@ -217,9 +295,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     });
   }
 
-  /// Shows a confirmation dialog and, on confirmation, deletes the Firestore
-  /// document and navigates back to the dashboard.
-  Future<void> _confirmAndDelete(BuildContext screenContext, String reportId) async {
+  Future<void> _confirmAndDelete(
+      BuildContext screenContext, String reportId) async {
     await showDialog<void>(
       context: screenContext,
       barrierDismissible: false,
@@ -231,8 +308,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16)),
               title: const Text('Delete Report',
-                  style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w700)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               content: const Text(
                 'Are you sure you want to delete this report? '
                 'This action cannot be undone.',
@@ -241,7 +317,6 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
               actionsPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               actions: [
-                // Cancel
                 TextButton(
                   onPressed:
                       isDeleting ? null : () => Navigator.pop(dialogContext),
@@ -250,7 +325,6 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                           color: Color(0xFF757575),
                           fontWeight: FontWeight.w500)),
                 ),
-                // Delete
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE53935),
@@ -272,7 +346,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                             if (!mounted) return;
                             Navigator.pop(dialogContext); // close dialog
                             // ignore: use_build_context_synchronously
-                            SnackBarHelper.showSuccess(screenContext, 'Report deleted successfully.');
+                            SnackBarHelper.showSuccess(
+                                screenContext, 'Report deleted successfully.');
                             // ignore: use_build_context_synchronously
                             Navigator.pop(screenContext); // back to dashboard
                           } catch (e) {
@@ -281,7 +356,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                             // ignore: use_build_context_synchronously
                             Navigator.pop(dialogContext);
                             // ignore: use_build_context_synchronously
-                            SnackBarHelper.showError(screenContext, 'Failed to delete report: $e');
+                            SnackBarHelper.showError(
+                                screenContext, 'Failed to delete report: $e');
                           }
                         },
                   child: isDeleting
@@ -317,7 +393,11 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     try {
       final file = File(path);
       if (file.existsSync()) {
-        return Image.file(file, height: 160, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholderMedia());
+        return Image.file(file,
+            height: 160,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _placeholderMedia());
       }
     } catch (_) {}
     return _placeholderMedia();
@@ -337,30 +417,39 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     } else {
       createdAt = DateTime.now();
     }
-    final imageUrl = (data['imageUrl'] ?? data['mediaPath'] ?? data['media'] ?? '') as String?;
+    final imageUrl = (data['imageUrl'] ??
+        data['mediaPath'] ??
+        data['media'] ??
+        '') as String?;
     final categoryRaw = (data['category'] ?? '') as String?;
     IssueCategory category = IssueCategory.other;
     if (categoryRaw != null && categoryRaw.isNotEmpty) {
       try {
-        category = IssueCategory.values.firstWhere((e) => e.name.toLowerCase() == categoryRaw.toString().toLowerCase());
-      } catch (_) {
-        // ignore and keep other
-      }
+        category = IssueCategory.values.firstWhere((e) =>
+            e.name.toLowerCase() == categoryRaw.toString().toLowerCase());
+      } catch (_) {}
     }
     final loc = (data['location'] ?? '') as String? ?? '';
     final lat = (data['latitude'] as num?)?.toDouble();
     final lon = (data['longitude'] as num?)?.toDouble();
 
-    // Map status tolerant
     ReportStatus status = ReportStatus.received;
     final raw = rawStatus.toString().trim().toLowerCase();
-    if (raw.contains('reject') || raw.contains('invalid') || raw.contains('denied')) status = ReportStatus.rejected;
-    else if (raw.contains('resolv')) status = ReportStatus.resolved;
-    else if (raw.contains('active') || raw.contains('pending') || raw.contains('in progress') || raw.contains('assigned')) status = ReportStatus.assignedToDept;
-    else if (raw.contains('ai') || raw.contains('verified')) status = ReportStatus.aiVerified;
+    if (raw.contains('reject') ||
+        raw.contains('invalid') ||
+        raw.contains('denied'))
+      status = ReportStatus.rejected;
+    else if (raw.contains('resolv'))
+      status = ReportStatus.resolved;
+    else if (raw.contains('active') ||
+        raw.contains('pending') ||
+        raw.contains('in progress') ||
+        raw.contains('assigned'))
+      status = ReportStatus.assignedToDept;
+    else if (raw.contains('ai') || raw.contains('verified'))
+      status = ReportStatus.aiVerified;
     else if (raw.contains('received')) status = ReportStatus.received;
 
-    // Parse updates if present
     List<ReportUpdate> updates = [];
     final rawUpdates = data['updates'] as List<dynamic>?;
     if (rawUpdates != null) {
@@ -395,52 +484,76 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     final List<_Step> steps;
 
     if (isRejected) {
-      // ── Rejected branch: Received → Rejected (terminal) ─────────────────
       steps = [
-        _Step('Received',  Icons.inbox_rounded,         true,  true,  report.createdAt),
-        _Step('Rejected',  Icons.cancel_outlined,        true,  true,
-              report.updates.where((u) => u.message.toLowerCase().contains('reject')).firstOrNull?.timestamp,
-              isLast: true, isRejected: true),
+        _Step('Received', Icons.inbox_rounded, true, true, report.createdAt),
+        _Step(
+            'Rejected',
+            Icons.cancel_outlined,
+            true,
+            true,
+            report.updates
+                .where((u) => u.message.toLowerCase().contains('reject'))
+                .firstOrNull
+                ?.timestamp,
+            isLast: true,
+            isRejected: true),
       ];
     } else {
-      // ── Normal flow: Received → Verified → Assigned → Resolved ───────────
       steps = [
-        _Step('Received', Icons.inbox_rounded,           true,  true,  report.createdAt),
-        _Step('Verified', Icons.smart_toy_outlined,
-              report.status.index >= ReportStatus.aiVerified.index,
-              report.status.index >= ReportStatus.aiVerified.index,
-              report.updates.where((u) => u.message.toLowerCase().contains('ai') || u.message.toLowerCase().contains('verified')).firstOrNull?.timestamp),
-        _Step('Assigned', Icons.assignment_outlined,
-              report.status.index >= ReportStatus.assignedToDept.index,
-              report.status.index >= ReportStatus.assignedToDept.index,
-              null),
-        _Step('Resolved', Icons.check_circle_outline_rounded,
-              report.status == ReportStatus.resolved,
-              report.status == ReportStatus.resolved,
-              null, isLast: true),
+        _Step('Received', Icons.inbox_rounded, true, true, report.createdAt),
+        _Step(
+            'Verified',
+            Icons.smart_toy_outlined,
+            report.status.index >= ReportStatus.aiVerified.index,
+            report.status.index >= ReportStatus.aiVerified.index,
+            report.updates
+                .where((u) =>
+                    u.message.toLowerCase().contains('ai') ||
+                    u.message.toLowerCase().contains('verified'))
+                .firstOrNull
+                ?.timestamp),
+        _Step(
+            'Assigned',
+            Icons.assignment_outlined,
+            report.status.index >= ReportStatus.assignedToDept.index,
+            report.status.index >= ReportStatus.assignedToDept.index,
+            null),
+        _Step(
+            'Resolved',
+            Icons.check_circle_outline_rounded,
+            report.status == ReportStatus.resolved,
+            report.status == ReportStatus.resolved,
+            null,
+            isLast: true),
       ];
     }
 
-    return Column(children: steps.map((s) {
-      // Rejected step gets a red accent; everything else uses the helper colour
+    return Column(
+        children: steps.map((s) {
       final baseColor = s.isDone
-          ? (s.isRejected ? const Color(0xFFE53935) : getStatusData(s.label).color)
+          ? (s.isRejected
+              ? const Color(0xFFE53935)
+              : getStatusData(s.label).color)
           : const Color(0xFFE0E0E0);
 
       return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Column(children: [
           Container(
-            width: 32, height: 32,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: baseColor.withOpacity(s.isDone ? 1 : 0.15),
               shape: BoxShape.circle,
-              border: s.isDone ? null : Border.all(color: baseColor, width: 1.5),
+              border:
+                  s.isDone ? null : Border.all(color: baseColor, width: 1.5),
             ),
-            child: Icon(s.icon, size: 16, color: s.isDone ? Colors.white : baseColor),
+            child: Icon(s.icon,
+                size: 16, color: s.isDone ? Colors.white : baseColor),
           ),
           if (!s.isLast)
             Container(
-              width: 2, height: 40,
+              width: 2,
+              height: 40,
               color: baseColor.withOpacity(0.3),
             ),
         ]),
@@ -452,9 +565,12 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
             children: [
               Text(s.label,
                   style: TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: s.isDone
-                        ? (s.isRejected ? const Color(0xFFE53935) : const Color(0xFF1A1A2E))
+                        ? (s.isRejected
+                            ? const Color(0xFFE53935)
+                            : const Color(0xFF1A1A2E))
                         : const Color(0xFFBDBDBD),
                   )),
               if (s.isRejected && s.isDone)
@@ -462,7 +578,8 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     style: TextStyle(fontSize: 11, color: Color(0xFFE53935))),
               if (s.date != null)
                 Text(_formatDateTime(s.date!),
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E))),
+                    style: const TextStyle(
+                        fontSize: 11, color: Color(0xFF9E9E9E))),
               if (!s.isLast) const SizedBox(height: 20),
             ],
           ),
@@ -471,20 +588,87 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     }).toList());
   }
 
-  Widget _detailRow({required IconData icon, required String label, required String value, required Color iconColor}) {
+  Widget _detailRow(
+      {required IconData icon,
+      required String label,
+      required String value,
+      required Color iconColor}) {
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(width: 36, height: 36, decoration: BoxDecoration(color: iconColor.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, size: 18, color: iconColor)),
+      Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, size: 18, color: iconColor)),
       const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF9E9E9E), fontWeight: FontWeight.w500)), const SizedBox(height: 2), Text(value, style: const TextStyle(fontSize: 14, color: Color(0xFF1A1A2E), fontWeight: FontWeight.w500)),],),),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF9E9E9E),
+                    fontWeight: FontWeight.w500)),
+            const SizedBox(height: 2),
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF1A1A2E),
+                    fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
     ]);
   }
-  Widget _card({required Widget child}) => Container(width: double.infinity, padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2))],), child: child);
 
-  Widget _placeholderMedia() => Container(height: 160, color: const Color(0xFFECEFF1), child: const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.image_outlined, size: 40, color: Color(0xFFB0BEC5)), SizedBox(height: 6), Text('No photo attached', style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 13)),],),),
-  );
+  Widget _card({required Widget child}) => Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2))
+        ],
+      ),
+      child: child);
+
+  Widget _placeholderMedia() => Container(
+        height: 160,
+        color: const Color(0xFFECEFF1),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.image_outlined, size: 40, color: Color(0xFFB0BEC5)),
+              SizedBox(height: 6),
+              Text('No photo attached',
+                  style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 13)),
+            ],
+          ),
+        ),
+      );
 
   String _formatDateTime(DateTime d) {
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     final h = d.hour.toString().padLeft(2, '0');
     final min = d.minute.toString().padLeft(2, '0');
     return '${months[d.month - 1]} ${d.day}, ${d.year}  $h:$min';

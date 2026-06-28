@@ -46,6 +46,95 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
     super.dispose();
   }
 
+  void _showCityPicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final media = MediaQuery.of(ctx);
+        return SizedBox(
+          height: media.size.height * 0.7,
+          child: Padding(
+            padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 12,
+                bottom: media.viewInsets.bottom + 12),
+            child: Column(
+              children: [
+                Container(
+                  height: 6,
+                  width: 60,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const Text('Search City',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Builder(builder: (context) {
+                  final TextEditingController searchCtrl =
+                      TextEditingController();
+                  List<String> filtered = List.from(_cities);
+                  return Expanded(
+                    child: StatefulBuilder(builder: (context, setSheetState) {
+                      return Column(
+                        children: [
+                          TextField(
+                            controller: searchCtrl,
+                            autofocus: true,
+                            decoration: const InputDecoration(
+                              hintText: 'Type to search...',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            onChanged: (q) {
+                              final qq = q.trim().toLowerCase();
+                              setSheetState(() {
+                                filtered = _cities
+                                    .where((c) =>
+                                        c.toLowerCase().contains(qq))
+                                    .toList();
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: ListView.separated(
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (context, i) {
+                                final city = filtered[i];
+                                return ListTile(
+                                  title: Text(city),
+                                  onTap: () {
+                                    setState(() => _city = city);
+                                    Navigator.of(ctx).pop();
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _completeProfile() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isLoading = true);
@@ -66,7 +155,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       );
 
       if (!mounted) return;
-      SnackBarHelper.showSuccess(context, 'Welcome to UrbanPulse! 🎉');
+      SnackBarHelper.showSuccess(context, 'Welcome to UrbanPulse! ðŸŽ‰');
       Navigator.pushNamedAndRemoveUntil(
           context, '/main', (route) => false);
     } on FirebaseException catch (e) {
@@ -89,7 +178,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        // ── Light teal gradient background ─────────────────────────────────
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -119,7 +207,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  'One Last Step! 👋',
+                  'One Last Step! ðŸ‘‹',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 26,
@@ -140,25 +228,18 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                 const SizedBox(height: 32),
 
                 // ── Elevated Card ───────────────────────────────────────────
-                Card(
-                  elevation: 16,
-                  shadowColor: Colors.black38,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(28),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                GlassAuthCard(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const Text(
                             'Complete Your Profile',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF062B36),
+                              color: Colors.white,
                               letterSpacing: -0.4,
                             ),
                           ),
@@ -167,20 +248,20 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                             'Required for municipality follow-ups',
                             style: TextStyle(
                               fontSize: 13,
-                              color: Color(0xFF94A3B8),
+                              color: Colors.white70,
                             ),
                           ),
                           const SizedBox(height: 24),
 
-                          // ── Phone Number ──────────────────────────────────
                           TextFormField(
                             controller: _phone,
+                            style: const TextStyle(color: Colors.white),
                             keyboardType: TextInputType.phone,
                             decoration: authInputDecoration(
                               'Phone Number',
                               prefixIcon: const Icon(
                                 Icons.phone_outlined,
-                                color: kPrimaryTeal,
+                                color: Colors.white70,
                                 size: 20,
                               ),
                             ),
@@ -190,35 +271,28 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                           ),
                           const SizedBox(height: 16),
 
-                          // ── City Dropdown ─────────────────────────────────
-                          DropdownButtonFormField<String>(
+                          TextFormField(
+                            readOnly: true,
+                            onTap: _showCityPicker,
+                            controller:
+                                TextEditingController(text: _city ?? ''),
+                            style: const TextStyle(color: Colors.white),
                             decoration: authInputDecoration(
                               'Select Your City',
                               prefixIcon: const Icon(
                                 Icons.location_city_outlined,
-                                color: kPrimaryTeal,
+                                color: Colors.white70,
+                                size: 20,
+                              ),
+                              suffixIcon: const Icon(
+                                Icons.search,
+                                color: Colors.white70,
                                 size: 20,
                               ),
                             ),
-                            initialValue: _city,
-                            icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                                color: kPrimaryTeal),
-                            dropdownColor: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            items: _cities
-                                .map((c) => DropdownMenuItem(
-                                      value: c,
-                                      child: Text(
-                                        c,
-                                        style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Color(0xFF062B36)),
-                                      ),
-                                    ))
-                                .toList(),
-                            onChanged: (v) => setState(() => _city = v),
-                            validator: (v) =>
-                                (v == null || v.isEmpty) ? 'Please select your city' : null,
+                            validator: (_) => (_city == null || _city!.isEmpty)
+                                ? 'Please select your city'
+                                : null,
                           ),
 
                           const SizedBox(height: 32),
@@ -285,11 +359,9 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
                         ],
                       ),
                     ),
-                  ),
                 ),
 
                 const SizedBox(height: 24),
-                // ── Footer note ─────────────────────────────────────────────
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

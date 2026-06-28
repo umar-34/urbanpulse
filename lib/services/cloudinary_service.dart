@@ -6,8 +6,6 @@ class CloudinaryService {
   static const String cloudName = "dh51uajxy";
   static const String uploadPreset = "fyp_reports_preset";
 
-  /// Uploads a local file to Cloudinary and returns the secure HTTPS URL.
-  /// Returns null on failure.
   static Future<String?> uploadImage(String filePath) async {
     try {
       final file = File(filePath);

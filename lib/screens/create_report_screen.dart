@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -17,24 +18,24 @@ import '../services/notification_service.dart';
 
 const List<String> PUNJAB_CITIES = [
   "Bahawalpur",
-"Bhakkar",
-"Dera Ghazi Khan",
-"Faisalabad",
-"Gujranwala",
-"Jhang",
-"Kasur",
-"Lahore",
-"Mianwali",
-"Multan",
-"Okara",
-"Rahim Yar Khan",
-"Rawalpindi",
-"Sahiwal",
-"Sargodha",
-"Sheikhupura",
-"Sialkot",
-"Taxila",
-"Wah Cantt"
+  "Bhakkar",
+  "Dera Ghazi Khan",
+  "Faisalabad",
+  "Gujranwala",
+  "Jhang",
+  "Kasur",
+  "Lahore",
+  "Mianwali",
+  "Multan",
+  "Okara",
+  "Rahim Yar Khan",
+  "Rawalpindi",
+  "Sahiwal",
+  "Sargodha",
+  "Sheikhupura",
+  "Sialkot",
+  "Taxila",
+  "Wah Cantt"
 ];
 
 class _Cat {
@@ -138,7 +139,9 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                 }
                 await _pick(ImageSource.camera, closeModal: false);
               }),
-              _mediaOption(Icons.photo_library_rounded, 'Choose Images from Gallery', () async {
+              _mediaOption(
+                  Icons.photo_library_rounded, 'Choose Images from Gallery',
+                  () async {
                 Navigator.pop(context);
                 final ok = await _ensureGalleryPermission();
                 if (!ok) {
@@ -166,8 +169,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     if (res.isGranted) return true;
 
     if (res.isPermanentlyDenied) {
-      await _showOpenSettingsDialog(
-          'Camera Permission', 'Camera permission is permanently denied. Open settings to enable it.');
+      await _showOpenSettingsDialog('Camera Permission',
+          'Camera permission is permanently denied. Open settings to enable it.');
     }
     return false;
   }
@@ -178,11 +181,10 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       final photosStatus = await Permission.photos.status;
       if (storageStatus.isGranted || photosStatus.isGranted) return true;
 
-      final proceed = await _showPermissionRationale(
-          'Storage Permission', 'The app needs storage access to select photos from your gallery.');
+      final proceed = await _showPermissionRationale('Storage Permission',
+          'The app needs storage access to select photos from your gallery.');
       if (!proceed) return false;
 
-      // Try requesting storage first (older Android), then photos (Android 13+)
       final resStorage = await Permission.storage.request();
       if (resStorage.isGranted) return true;
 
@@ -198,8 +200,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       final status = await Permission.photos.status;
       if (status.isGranted) return true;
 
-      final proceed = await _showPermissionRationale(
-          'Photos Permission', 'The app needs Photos access to select images from your gallery.');
+      final proceed = await _showPermissionRationale('Photos Permission',
+          'The app needs Photos access to select images from your gallery.');
       if (!proceed) return false;
 
       final res = await Permission.photos.request();
@@ -219,8 +221,12 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         title: Text(title),
         content: Text(message),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Proceed')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Proceed')),
         ],
       ),
     );
@@ -234,7 +240,9 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         title: Text(title),
         content: Text(message),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
           TextButton(
               onPressed: () async {
                 Navigator.pop(context, true);
@@ -275,6 +283,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       _showSnack('Could not access gallery: $e');
     }
   }
+
   Future<void> _pick(ImageSource source, {bool closeModal = true}) async {
     if (closeModal) Navigator.pop(context);
     try {
@@ -307,17 +316,22 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     });
     try {
       final result = await LocationService.getCurrentLocation();
-      // Try to get cleaned area,city from reverse geocode (subLocality/locality)
       String area = '';
       String city = '';
       try {
-        final rev = await LocationService.reverseGeocode(result.latitude, result.longitude);
+        final rev = await LocationService.reverseGeocode(
+            result.latitude, result.longitude);
         if (rev.isNotEmpty) {
-          final parts = rev.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+          final parts = rev
+              .split(',')
+              .map((s) => s.trim())
+              .where((s) => s.isNotEmpty)
+              .toList();
           if (parts.isNotEmpty) city = parts.last;
           if (parts.length >= 2) area = parts.first;
-          // avoid duplicate city in area field
-          if (area.isNotEmpty && city.isNotEmpty && area.toLowerCase() == city.toLowerCase()) {
+          if (area.isNotEmpty &&
+              city.isNotEmpty &&
+              area.toLowerCase() == city.toLowerCase()) {
             area = '';
           }
         }
@@ -373,45 +387,36 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         return;
       }
     }
-        // Address validation: require geo location to be fetched AND street/area/city filled
-        final autoFetched = _address1Ctrl.text.trim().isNotEmpty;
-        if (!autoFetched) {
-          _invalidFields.add('address1');
-          setState(() {});
-          _showSnack('Please fetch location using the Geo Location button.',
-              fields: ['address1']);
-          return;
-        }
+    final autoFetched = _address1Ctrl.text.trim().isNotEmpty;
+    if (!autoFetched) {
+      _invalidFields.add('address1');
+      setState(() {});
+      _showSnack('Please fetch location using the Geo Location button.',
+          fields: ['address1']);
+      return;
+    }
 
-        if (_streetCtrl.text.trim().isEmpty) {
-          _invalidFields.add('street');
-          setState(() {});
-          _showSnack('Please provide Street Address.', fields: ['street']);
-          return;
-        }
-        if (_areaCtrl.text.trim().isEmpty) {
-          _invalidFields.add('area');
-          setState(() {});
-          _showSnack('Please provide Area.', fields: ['area']);
-          return;
-        }
-        if (_cityCtrl.text.trim().isEmpty) {
-          _invalidFields.add('city');
-          setState(() {});
-          _showSnack('Please provide City.', fields: ['city']);
-          return;
-        }
+    if (_areaCtrl.text.trim().isEmpty) {
+      _invalidFields.add('area');
+      setState(() {});
+      _showSnack('Please provide Area.', fields: ['area']);
+      return;
+    }
+    if (_cityCtrl.text.trim().isEmpty) {
+      _invalidFields.add('city');
+      setState(() {});
+      _showSnack('Please provide City.', fields: ['city']);
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
     try {
-      // ── Step A: Upload all images to Cloudinary ─────────────────────────
       final uploadFutures = _imagePaths
           .map((path) => CloudinaryService.uploadImage(path))
           .toList();
       final uploadResults = await Future.wait(uploadFutures);
 
-      // Filter out any failed uploads (null results)
       final imageUrls = uploadResults.whereType<String>().toList();
 
       // Primary image URL (first successfully uploaded image)
@@ -444,7 +449,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         description: _descriptionCtrl.text.trim().isEmpty
             ? null
             : _descriptionCtrl.text.trim(),
-        // Store primary Cloudinary URL (or null) in the model's mediaPath
         mediaPath: primaryImageUrl,
         isVideo: false,
         updates: [
@@ -456,7 +460,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         ],
       );
 
-      // ── Step C: Build and push Firestore document ────────────────────────
       final uid = FirebaseAuth.instance.currentUser?.uid;
       final data = {
         'id': report.id,
@@ -469,7 +472,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         'timestamp': FieldValue.serverTimestamp(),
         'userId': uid,
         'description': report.description,
-        // Primary Cloudinary URL for backwards-compatible reads
         'imageUrl': primaryImageUrl,
         // Full list of uploaded image URLs
         'imageUrls': imageUrls,
@@ -488,7 +490,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           userId: uid,
           reportId: report.id,
           title: 'Report Received',
-          body: 'Your "${report.title}" report has been received and is queued for verification.',
+          body:
+              'Your "${report.title}" report has been received and is queued for verification.',
         );
       }
 
@@ -499,7 +502,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       // ignore: avoid_print
       print('REPORT SUBMIT ERROR: $e');
       if (!mounted) return;
-      SnackBarHelper.showError(context, 'Failed to submit report: ${e.toString()}');
+      SnackBarHelper.showError(
+          context, 'Failed to submit report: ${e.toString()}');
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -541,7 +545,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                 const SizedBox(height: 8),
                 // Search and list (stateful inside the sheet)
 
-                // Keep controllers/state outside the inner builder so they persist
                 Builder(builder: (context) {
                   final TextEditingController searchCtrl =
                       TextEditingController();
@@ -732,392 +735,479 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
             padding: const EdgeInsets.all(20),
             children: [
               // ── Step 1: Photo/Video ──────────────────────────────────────────
-              _sectionLabel('Step 1 • Evidence'),
+              _sectionLabel('Step 1 â€¢ Evidence'),
               const SizedBox(height: 10),
-              GestureDetector(
-                onTap: _showMediaPicker,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  height: 180,
-                  decoration: BoxDecoration(
-                    color: _imagePaths.isNotEmpty ? const Color(0xFF064554).withOpacity(0.06) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _imagePaths.isNotEmpty ? const Color(0xFF064554).withOpacity(0.4) : (_invalidFields.contains('media') ? const Color(0xFFB71C1C) : const Color(0xFFE0E0E0)),
-                      width: _imagePaths.isNotEmpty ? 2 : 1.5,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: GestureDetector(
+                    onTap: _showMediaPicker,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      height: 180,
+                      decoration: BoxDecoration(
+                        color: _imagePaths.isNotEmpty
+                            ? const Color(0xFF064554).withOpacity(0.10)
+                            : Colors.white.withOpacity(0.62),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _imagePaths.isNotEmpty
+                              ? const Color(0xFF064554).withOpacity(0.4)
+                              : (_invalidFields.contains('media')
+                                  ? const Color(0xFFB71C1C)
+                                  : const Color(0xFF064554).withOpacity(0.14)),
+                          width: _imagePaths.isNotEmpty ? 2 : 1.1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.07),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: _imagePaths.isNotEmpty
+                          ? _mediaPreview()
+                          : _mediaPlaceholder(),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2)),
-                    ],
                   ),
-                  child: _imagePaths.isNotEmpty ? _mediaPreview() : _mediaPlaceholder(),
                 ),
               ),
 
               const SizedBox(height: 24),
               // ── Step 2: Category ─────────────────────────────────────────────
-              _sectionLabel('Step 2 • Issue Category'),
+              _sectionLabel('Step 2 â€¢ Issue Category'),
               const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                      color: _invalidFields.contains('category') &&
-                              _selectedCategory == null
-                          ? const Color(0xFFB71C1C)
-                          : Colors.transparent),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2)),
-                  ],
-                ),
-                child: Row(
-                  children: _categories.map((cat) {
-                    final sel = _selectedCategory == cat.category;
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() {
-                          _selectedCategory = cat.category;
-                          _invalidFields.remove('category');
-                          if (_invalidFields.isEmpty) _topErrorMsg = null;
-                        }),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: 52,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                color: sel
-                                    ? const Color(0xFF064554)
-                                    : const Color(0xFFF5F7FA),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.62),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _invalidFields.contains('category') &&
+                                _selectedCategory == null
+                            ? const Color(0xFFB71C1C)
+                            : const Color(0xFF064554).withOpacity(0.14),
+                        width: 1.1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.07),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4)),
+                      ],
+                    ),
+                    child: Row(
+                      children: _categories.map((cat) {
+                        final sel = _selectedCategory == cat.category;
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() {
+                              _selectedCategory = cat.category;
+                              _invalidFields.remove('category');
+                              if (_invalidFields.isEmpty) _topErrorMsg = null;
+                            }),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: 52,
+                                  height: 52,
+                                  decoration: BoxDecoration(
                                     color: sel
                                         ? const Color(0xFF064554)
-                                        : const Color(0xFFE0E0E0)),
-                              ),
-                              child: Icon(cat.icon,
-                                  color: sel
-                                      ? Colors.white
-                                      : const Color(0xFF616161),
-                                  size: 24),
-                            ),
-                            const SizedBox(height: 6),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 4.0),
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  cat.label,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight:
-                                        sel ? FontWeight.w700 : FontWeight.w400,
-                                    color: sel
-                                        ? const Color(0xFF064554)
-                                        : const Color(0xFF757575),
-                                    height: 1.2,
+                                        : const Color(0xFFF5F7FA),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                        color: sel
+                                            ? const Color(0xFF064554)
+                                            : const Color(0xFFE0E0E0)),
+                                  ),
+                                  child: Icon(cat.icon,
+                                      color: sel
+                                          ? Colors.white
+                                          : const Color(0xFF616161),
+                                      size: 24),
+                                ),
+                                const SizedBox(height: 6),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 4.0),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      cat.label,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: sel
+                                            ? FontWeight.w700
+                                            : FontWeight.w400,
+                                        color: sel
+                                            ? const Color(0xFF064554)
+                                            : const Color(0xFF757575),
+                                        height: 1.2,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
                 ),
               ),
 
               const SizedBox(height: 24),
               // ── Step 3: Location ─────────────────────────────────────────────
-              _sectionLabel('Step 3 • Location'),
+              _sectionLabel('Step 3 â€¢ Location'),
               const SizedBox(height: 10),
-              // Heading above both auto-fetch and manual inputs
               const Padding(
                 padding: EdgeInsets.only(left: 2, bottom: 8),
                 child: Text('Location Details',
                     style:
                         TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               ),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withOpacity(0.03),
-                        blurRadius: 6,
-                        offset: const Offset(0, 1)),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _address1Ctrl,
-                            readOnly: true,
-                            decoration: InputDecoration(
-                              labelText: 'Geo Location',
-                              hintText: 'Click the GPS icon',
-                              errorText: _invalidFields.contains('address1') ? 'Required' : null,
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                    color: _invalidFields.contains('address1')
-                                        ? const Color(0xFFB71C1C)
-                                        : const Color(0xFFE0E0E0)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                    color: _invalidFields.contains('address1')
-                                        ? const Color(0xFFB71C1C)
-                                        : const Color(0xFF064554)),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        SizedBox(
-                          height: 48,
-                          child: ElevatedButton(
-                            onPressed: _locating ? null : _fetchLocation,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF064554),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                            ),
-                            child: _locating
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Colors.white))
-                                : const Icon(Icons.my_location_rounded),
-                          ),
-                        ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.62),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF064554).withOpacity(0.14),
+                        width: 1.1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.07),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4)),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    // Manual inputs
-                    TextField(
-                      controller: _streetCtrl,
-                      onChanged: (v) {
-                        if (v.trim().isNotEmpty &&
-                            _invalidFields.remove('street')) {
-                          setState(() {
-                            if (_invalidFields.isEmpty) _topErrorMsg = null;
-                          });
-                        }
-                      },
-                      decoration: InputDecoration(
-                        labelText: 'Street Address *',
-                        hintText: 'Street name, building number',
-                        errorText: _invalidFields.contains('street') ? 'Required' : null,
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color: _invalidFields.contains('street')
-                                  ? const Color(0xFFB71C1C)
-                                  : const Color(0xFFE0E0E0)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color: _invalidFields.contains('street')
-                                  ? const Color(0xFFB71C1C)
-                                  : const Color(0xFF064554)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _areaCtrl,
-                            onChanged: (v) {
-                              if (v.trim().isNotEmpty &&
-                                  _invalidFields.remove('area')) {
-                                setState(() {
-                                  if (_invalidFields.isEmpty) {
-                                    _topErrorMsg = null;
-                                  }
-                                });
-                              }
-                            },
-                            decoration: InputDecoration(
-                              labelText: 'Area *',
-                              hintText: 'Neighborhood / area',
-                              errorText: _invalidFields.contains('area') ? 'Required' : null,
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                    color: _invalidFields.contains('area')
-                                        ? const Color(0xFFB71C1C)
-                                        : const Color(0xFFE0E0E0)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                    color: _invalidFields.contains('area')
-                                        ? const Color(0xFFB71C1C)
-                                        : const Color(0xFF064554)),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: _cityCtrl,
-                            readOnly: true,
-                            onTap: _showCityPicker,
-                            decoration: InputDecoration(
-                              labelText: 'City *',
-                              hintText: 'City',
-                              errorText: _invalidFields.contains('city') ? 'Required' : null,
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                              suffixIcon: const Icon(Icons.search),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                    color: _invalidFields.contains('city')
-                                        ? const Color(0xFFB71C1C)
-                                        : const Color(0xFFE0E0E0)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                    color: _invalidFields.contains('city')
-                                        ? const Color(0xFFB71C1C)
-                                        : const Color(0xFF064554)),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _landmarkCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Landmark',
-                        hintText: 'Nearby landmark (optional)',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                    ),
-                    if (_locationError != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          _locationError!,
-                          style: const TextStyle(
-                              fontSize: 11, color: Color(0xFFE53935)),
-                        ),
-                      ),
-                    if (_latitude != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Row(
+                        Row(
                           children: [
-                            const Icon(Icons.check_circle_rounded,
-                                size: 14, color: Color(0xFF43A047)),
-                            const SizedBox(width: 4),
-                            Text(
-                              'GPS: ${_latitude!.toStringAsFixed(5)}, '
-                              '${_longitude!.toStringAsFixed(5)}',
-                              style: const TextStyle(
-                                  fontSize: 11, color: Color(0xFF43A047)),
+                            Expanded(
+                              child: TextField(
+                                controller: _address1Ctrl,
+                                readOnly: true,
+                                decoration: InputDecoration(
+                                  labelText: 'Geo Location',
+                                  hintText: 'Click the GPS icon',
+                                  errorText: _invalidFields.contains('address1')
+                                      ? 'Required'
+                                      : null,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  isDense: true,
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                        color:
+                                            _invalidFields.contains('address1')
+                                                ? const Color(0xFFB71C1C)
+                                                : const Color(0xFFE0E0E0)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                        color:
+                                            _invalidFields.contains('address1')
+                                                ? const Color(0xFFB71C1C)
+                                                : const Color(0xFF064554)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            SizedBox(
+                              height: 48,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: BackdropFilter(
+                                  filter:
+                                      ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF064554)
+                                          .withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: const Color(0xFF064554)
+                                            .withOpacity(0.14),
+                                        width: 1.1,
+                                      ),
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap:
+                                            _locating ? null : _fetchLocation,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16),
+                                          child: Center(
+                                            child: _locating
+                                                ? const SizedBox(
+                                                    width: 18,
+                                                    height: 18,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                            color: Color(
+                                                                0xFF064554)))
+                                                : const Icon(
+                                                    Icons.my_location_rounded,
+                                                    color: Color(0xFF064554)),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                  ],
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _streetCtrl,
+                          decoration: InputDecoration(
+                            labelText: 'Street Address',
+                            hintText: 'Street name, building number (optional)',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            isDense: true,
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFFE0E0E0)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                                  const BorderSide(color: Color(0xFF064554)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _areaCtrl,
+                                onChanged: (v) {
+                                  if (v.trim().isNotEmpty &&
+                                      _invalidFields.remove('area')) {
+                                    setState(() {
+                                      if (_invalidFields.isEmpty) {
+                                        _topErrorMsg = null;
+                                      }
+                                    });
+                                  }
+                                },
+                                decoration: InputDecoration(
+                                  labelText: 'Area *',
+                                  hintText: 'Neighborhood / area',
+                                  errorText: _invalidFields.contains('area')
+                                      ? 'Required'
+                                      : null,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  isDense: true,
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                        color: _invalidFields.contains('area')
+                                            ? const Color(0xFFB71C1C)
+                                            : const Color(0xFFE0E0E0)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                        color: _invalidFields.contains('area')
+                                            ? const Color(0xFFB71C1C)
+                                            : const Color(0xFF064554)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                controller: _cityCtrl,
+                                readOnly: true,
+                                onTap: _showCityPicker,
+                                decoration: InputDecoration(
+                                  labelText: 'City *',
+                                  hintText: 'City',
+                                  errorText: _invalidFields.contains('city')
+                                      ? 'Required'
+                                      : null,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  isDense: true,
+                                  suffixIcon: const Icon(Icons.search),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                        color: _invalidFields.contains('city')
+                                            ? const Color(0xFFB71C1C)
+                                            : const Color(0xFFE0E0E0)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(
+                                        color: _invalidFields.contains('city')
+                                            ? const Color(0xFFB71C1C)
+                                            : const Color(0xFF064554)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: _landmarkCtrl,
+                          decoration: InputDecoration(
+                            labelText: 'Landmark',
+                            hintText: 'Nearby landmark (optional)',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            isDense: true,
+                          ),
+                        ),
+                        if (_locationError != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              _locationError!,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Color(0xFFE53935)),
+                            ),
+                          ),
+                        if (_latitude != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_circle_rounded,
+                                    size: 14, color: Color(0xFF43A047)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'GPS: ${_latitude!.toStringAsFixed(5)}, '
+                                  '${_longitude!.toStringAsFixed(5)}',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Color(0xFF43A047)),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
 
               const SizedBox(height: 24),
               // ── Step 4: Description ──────────────────────────────────────────
-              _sectionLabel('Step 4 • Description (Optional)'),
+              _sectionLabel('Step 4 â€¢ Description (Optional)'),
               const SizedBox(height: 10),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE0E0E0)),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2)),
-                  ],
-                ),
-                child: TextField(
-                  controller: _descriptionCtrl,
-                  maxLines: 4,
-                  style:
-                      const TextStyle(fontSize: 14, color: Color(0xFF1A1A2E)),
-                  decoration: const InputDecoration(
-                    hintText: 'Add a brief description (optional)...',
-                    hintStyle:
-                        TextStyle(color: Color(0xFFBDBDBD), fontSize: 14),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.all(16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.62),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: const Color(0xFF064554).withOpacity(0.14),
+                        width: 1.1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.07),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4)),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _descriptionCtrl,
+                      maxLines: 4,
+                      style: const TextStyle(
+                          fontSize: 14, color: Color(0xFF1A1A2E)),
+                      decoration: const InputDecoration(
+                        hintText: 'Add a brief description (optional)...',
+                        hintStyle:
+                            TextStyle(color: Color(0xFFBDBDBD), fontSize: 14),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.all(16),
+                      ),
+                    ),
                   ),
                 ),
               ),
 
               const SizedBox(height: 32),
-              // ── Submit ───────────────────────────────────────────────────────
               GestureDetector(
                 onTap: _isSubmitting ? null : _submitReport,
-                child: Container(
-                  width: double.infinity,
-                  height: 54,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: _isSubmitting 
-                          ? [const Color(0xFF90CAF9), const Color(0xFF64B5F6)]
-                          : [const Color(0xFF064554), const Color(0xFF0a6378)],
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: _isSubmitting ? [] : [
-                      BoxShadow(
-                        color: const Color(0xFF064554).withOpacity(0.35),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                    child: Container(
+                      width: double.infinity,
+                      height: 54,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF064554).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: const Color(0xFF064554).withOpacity(0.14),
+                          width: 1.1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.07),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ],
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2.5, color: Color(0xFF064554)))
+                          : const Text('Submit Report',
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF064554))),
+                    ),
                   ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2.5, color: Colors.white))
-                      : const Text('Submit Report',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white)),
                 ),
               ),
               const SizedBox(height: 40),
@@ -1152,10 +1242,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   Widget _mediaPreview() {
     // Images grid preview (up to 4 images)
 
-    // Otherwise show a 2x2 grid for up to 4 images sized to available space
     return LayoutBuilder(builder: (context, constraints) {
-      // compute childAspectRatio so 2 rows fit into parent height
-      // Account for GridView padding (8 each side) and the spacing between items (8)
       const double gridPadding = 8; // padding applied to GridView
       const double crossSpacing = 8; // horizontal spacing between columns
       const double mainSpacing = 8; // vertical spacing between rows
@@ -1214,7 +1301,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           // empty slot: show add button
           return GestureDetector(
             onTap: () async {
-              // show media choice sheet so user can pick camera or gallery each time
               _showMediaPicker();
             },
             child: Container(

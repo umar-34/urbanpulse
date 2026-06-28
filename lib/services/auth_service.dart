@@ -8,8 +8,6 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // ─── Email / Password ──────────────────────────────────────────────────────
-
   Future<UserCredential> registerWithEmailAndPassword(
       String email, String password) async {
     return await _auth.createUserWithEmailAndPassword(
@@ -30,17 +28,11 @@ class AuthService {
     await _auth.signOut();
   }
 
-  // ─── Google Sign-In ────────────────────────────────────────────────────────
-
-  /// Signs in with Google, then routes the user to either the Home screen
-  /// (returning citizen) or ProfileCompletionScreen (new citizen).
   Future<void> signInWithGoogle(BuildContext context) async {
     try {
-      // 1. Trigger the Google sign-in UI
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) return; // user cancelled
 
-      // 2. Obtain auth credentials
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
@@ -48,7 +40,6 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      // 3. Sign in to FirebaseAuth
       final UserCredential userCredential =
           await _auth.signInWithCredential(credential);
       final User? user = userCredential.user;
@@ -61,7 +52,6 @@ class AuthService {
         return;
       }
 
-      // 4. Check Firestore for an existing profile
       final docSnap = await _db.collection('users').doc(user.uid).get();
 
       // Guard context after second async gap
@@ -73,11 +63,9 @@ class AuthService {
           (data?['city'] as String? ?? '').isNotEmpty;
 
       if (isReturning) {
-        // ── Returning Citizen → straight to Home ──────────────────────────
         Navigator.pushNamedAndRemoveUntil(
             context, '/main', (route) => false);
       } else {
-        // ── New Citizen → save base profile, then collect missing fields ──
         await _db.collection('users').doc(user.uid).set(
           {
             'uid': user.uid,

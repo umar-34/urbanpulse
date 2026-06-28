@@ -19,6 +19,5 @@ StatusData getStatusData(String status) {
     return const StatusData('Assigned', Color(0xFFFFC107), icon: Icons.assignment_ind_outlined);
   if (s.contains('received'))
     return const StatusData('Received', Color(0xFF9E9E9E), icon: Icons.inbox_outlined);
-  // default fallback
   return StatusData(status.isNotEmpty ? status : 'Received', const Color(0xFF9E9E9E));
 }

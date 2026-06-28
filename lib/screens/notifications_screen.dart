@@ -6,7 +6,6 @@ import '../models/notification_model.dart';
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
-  // ── Relative time formatter ─────────────────────────────────────────────
   static String _relativeTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inSeconds < 60) return 'Just now';
@@ -25,7 +24,6 @@ class NotificationsScreen extends StatelessWidget {
     return '${dt.day}/${dt.month}/${dt.year}';
   }
 
-  // ── Mark a single notification as read ─────────────────────────────────
   Future<void> _markRead(String docId) async {
     try {
       await FirebaseFirestore.instance
@@ -35,7 +33,6 @@ class NotificationsScreen extends StatelessWidget {
     } catch (_) {}
   }
 
-  // ── Mark all notifications as read ─────────────────────────────────────
   Future<void> _markAllRead(List<AppNotification> unread) async {
     final batch = FirebaseFirestore.instance.batch();
     for (final n in unread) {
@@ -117,7 +114,6 @@ class NotificationsScreen extends StatelessWidget {
                   .orderBy('timestamp', descending: true)
                   .snapshots(),
               builder: (context, snap) {
-                // ── Loading ────────────────────────────────────────────────
                 if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(
                     child: CircularProgressIndicator(
@@ -127,7 +123,6 @@ class NotificationsScreen extends StatelessWidget {
                   );
                 }
 
-                // ── Error ──────────────────────────────────────────────────
                 if (snap.hasError) {
                   return Center(
                     child: Text(
@@ -139,7 +134,6 @@ class NotificationsScreen extends StatelessWidget {
                   );
                 }
 
-                // ── Empty ──────────────────────────────────────────────────
                 final docs = snap.data?.docs ?? [];
                 if (docs.isEmpty) {
                   return _emptyState('No notifications yet');
@@ -226,8 +220,6 @@ class NotificationsScreen extends StatelessWidget {
   }
 }
 
-// ── Notification Tile ─────────────────────────────────────────────────────────
-
 class _NotificationTile extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback onTap;
@@ -308,7 +300,6 @@ class _NotificationTile extends StatelessWidget {
             ),
             const SizedBox(width: 14),
 
-            // ── Content ───────────────────────────────────────────────────
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,7 +365,7 @@ class _NotificationTile extends StatelessWidget {
                       if (notification.reportId != null) ...[
                         const Spacer(),
                         Text(
-                          'View report →',
+                          'View report â†’',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,

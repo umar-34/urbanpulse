@@ -1,7 +1,7 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-// shimmer removed — simplified skeletons use static placeholders
 import '../models/report.dart';
 import 'status_badge.dart';
 import '../utils/status_helper.dart';
@@ -16,28 +16,30 @@ class ReportCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 170,
-        constraints: const BoxConstraints(minHeight: 140, maxHeight: 160),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.white, Color(0xFFF8FAFC)],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF064554).withOpacity(0.06),
-              blurRadius: 12,
-              spreadRadius: 1,
-              offset: const Offset(0, 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            width: 170,
+            constraints: const BoxConstraints(minHeight: 140, maxHeight: 160),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.62),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF064554).withOpacity(0.14),
+                width: 1.1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Column(
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -62,7 +64,6 @@ class ReportCard extends StatelessWidget {
                         : _iconBox(),
                   ),
                 ),
-                // Status dot
                 Container(
                   width: 10,
                   height: 10,
@@ -107,6 +108,8 @@ class ReportCard extends StatelessWidget {
           ],
         ),
       ),
+        ),
+      ),
     );
   }
 
@@ -135,7 +138,6 @@ class ReportCard extends StatelessWidget {
   }
 
   Color _statusColor(ReportStatus s) {
-    // Use the rawStatus when possible to preserve DB string mapping
     try {
       return getStatusData(report.rawStatus).color;
     } catch (_) {

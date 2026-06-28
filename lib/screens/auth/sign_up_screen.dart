@@ -54,10 +54,98 @@ class _SignUpScreenState extends State<SignUpScreen> {
     "Wah Cantt",
   ];
 
+  void _showCityPicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final media = MediaQuery.of(ctx);
+        return SizedBox(
+          height: media.size.height * 0.7,
+          child: Padding(
+            padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 12,
+                bottom: media.viewInsets.bottom + 12),
+            child: Column(
+              children: [
+                Container(
+                  height: 6,
+                  width: 60,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const Text('Search City',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Builder(builder: (context) {
+                  final TextEditingController searchCtrl =
+                      TextEditingController();
+                  List<String> filtered = List.from(_cities);
+                  return Expanded(
+                    child: StatefulBuilder(builder: (context, setSheetState) {
+                      return Column(
+                        children: [
+                          TextField(
+                            controller: searchCtrl,
+                            autofocus: true,
+                            decoration: const InputDecoration(
+                              hintText: 'Type to search...',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            onChanged: (q) {
+                              final qq = q.trim().toLowerCase();
+                              setSheetState(() {
+                                filtered = _cities
+                                    .where((c) =>
+                                        c.toLowerCase().contains(qq))
+                                    .toList();
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: ListView.separated(
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (context, i) {
+                                final city = filtered[i];
+                                return ListTile(
+                                  title: Text(city),
+                                  onTap: () {
+                                    setState(() => _city = city);
+                                    Navigator.of(ctx).pop();
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Full gradient background
       body: Container(
         decoration: const BoxDecoration(gradient: kThemeGradient),
         child: SafeArea(
@@ -87,7 +175,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
               ),
 
-              // ── Scrollable content ────────────────────────────────────────
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
@@ -95,7 +182,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     child: Column(
                       children: [
                         if (!_verificationPending) ...[
-                          // Tagline
                           const Text(
                             'Join thousands of citizens making\ntheir city a better place',
                             textAlign: TextAlign.center,
@@ -108,20 +194,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           const SizedBox(height: 20),
 
                           // ── White card ─────────────────────────────────────
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(28),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.15),
-                                  blurRadius: 32,
-                                  offset: const Offset(0, 12),
-                                ),
-                              ],
-                            ),
+                          GlassAuthCard(
                             child: Form(
                               key: _formKey,
                               child: Column(
@@ -133,7 +206,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                     style: TextStyle(
                                       fontSize: 26,
                                       fontWeight: FontWeight.w800,
-                                      color: Color(0xFF062B36),
+                                      color: Colors.white,
                                       letterSpacing: -0.5,
                                     ),
                                   ),
@@ -142,19 +215,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                     'Fill in your details to create your account',
                                     style: TextStyle(
                                       fontSize: 13,
-                                      color: Color(0xFF94A3B8),
+                                      color: Colors.white70,
                                     ),
                                   ),
                                   const SizedBox(height: 24),
 
-                                  // Full Name
                                   TextFormField(
                                     controller: _name,
+                                    style: const TextStyle(color: Colors.white),
                                     decoration: authInputDecoration(
                                       'Full Name',
                                       prefixIcon: const Icon(
                                         Icons.person_outline_rounded,
-                                        color: kPrimaryTeal,
+                                        color: Colors.white70,
                                         size: 20,
                                       ),
                                     ),
@@ -164,38 +237,40 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   ),
                                   const SizedBox(height: 14),
 
-                                  // City dropdown
-                                  DropdownButtonFormField<String>(
+                                  TextFormField(
+                                    readOnly: true,
+                                    onTap: _showCityPicker,
+                                    controller: TextEditingController(
+                                        text: _city ?? ''),
+                                    style: const TextStyle(color: Colors.white),
                                     decoration: authInputDecoration(
                                       'City',
                                       prefixIcon: const Icon(
                                         Icons.location_city_outlined,
-                                        color: kPrimaryTeal,
+                                        color: Colors.white70,
+                                        size: 20,
+                                      ),
+                                      suffixIcon: const Icon(
+                                        Icons.search,
+                                        color: Colors.white70,
                                         size: 20,
                                       ),
                                     ),
-                                    items: _cities
-                                        .map((c) => DropdownMenuItem(
-                                            value: c, child: Text(c)))
-                                        .toList(),
-                                    initialValue: _city,
-                                    onChanged: (v) =>
-                                        setState(() => _city = v),
-                                    validator: (v) =>
-                                        (v == null || v.isEmpty)
+                                    validator: (_) =>
+                                        (_city == null || _city!.isEmpty)
                                             ? 'Required'
                                             : null,
                                   ),
                                   const SizedBox(height: 14),
 
-                                  // Email
                                   TextFormField(
                                     controller: _email,
+                                    style: const TextStyle(color: Colors.white),
                                     decoration: authInputDecoration(
                                       'Email Address',
                                       prefixIcon: const Icon(
                                         Icons.email_outlined,
-                                        color: kPrimaryTeal,
+                                        color: Colors.white70,
                                         size: 20,
                                       ),
                                     ),
@@ -207,14 +282,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   ),
                                   const SizedBox(height: 14),
 
-                                  // Phone
                                   TextFormField(
                                     controller: _phone,
+                                    style: const TextStyle(color: Colors.white),
                                     decoration: authInputDecoration(
                                       'Phone Number (03XXXXXXXXX)',
                                       prefixIcon: const Icon(
                                         Icons.phone_outlined,
-                                        color: kPrimaryTeal,
+                                        color: Colors.white70,
                                         size: 20,
                                       ),
                                     ),
@@ -237,15 +312,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   ),
                                   const SizedBox(height: 14),
 
-                                  // Password
                                   TextFormField(
                                     controller: _password,
+                                    style: const TextStyle(color: Colors.white),
                                     obscureText: _obscurePassword,
                                     decoration: authInputDecoration(
                                       'Password',
                                       prefixIcon: const Icon(
                                         Icons.lock_outlined,
-                                        color: kPrimaryTeal,
+                                        color: Colors.white70,
                                         size: 20,
                                       ),
                                       suffixIcon: IconButton(
@@ -253,7 +328,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                           _obscurePassword
                                               ? Icons.visibility_off_outlined
                                               : Icons.visibility_outlined,
-                                          color: Colors.grey.shade500,
+                                          color: Colors.white70,
                                           size: 20,
                                         ),
                                         onPressed: () => setState(
@@ -271,15 +346,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   ),
                                   const SizedBox(height: 14),
 
-                                  // Confirm Password
                                   TextFormField(
                                     controller: _confirm,
+                                    style: const TextStyle(color: Colors.white),
                                     obscureText: _obscureConfirm,
                                     decoration: authInputDecoration(
                                       'Confirm Password',
                                       prefixIcon: const Icon(
                                         Icons.lock_outline_rounded,
-                                        color: kPrimaryTeal,
+                                        color: Colors.white70,
                                         size: 20,
                                       ),
                                       suffixIcon: IconButton(
@@ -287,7 +362,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                           _obscureConfirm
                                               ? Icons.visibility_off_outlined
                                               : Icons.visibility_outlined,
-                                          color: Colors.grey.shade500,
+                                          color: Colors.white70,
                                           size: 20,
                                         ),
                                         onPressed: () => setState(
@@ -305,7 +380,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   ),
                                   const SizedBox(height: 28),
 
-                                  // Sign Up button — gradient
+                                  // Sign Up button â€” gradient
                                   GestureDetector(
                                     onTap: _isLoading ? null : _handleSignUp,
                                     child: Container(
@@ -354,7 +429,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                                   const SizedBox(height: 24),
 
-                                  // OR divider
                                   Row(children: [
                                     Expanded(
                                         child: Divider(
@@ -401,7 +475,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             ),
                           ),
 
-                          // ── Sign In link ─────────────────────────────────
                           const SizedBox(height: 28),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -433,20 +506,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ] else ...[
                           // ── Verification Pending Card ───────────────────
                           const SizedBox(height: 20),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(28),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.15),
-                                  blurRadius: 32,
-                                  offset: const Offset(0, 12),
-                                ),
-                              ],
-                            ),
+                          GlassAuthCard(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
@@ -456,18 +516,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   height: 70,
                                   margin: const EdgeInsets.only(bottom: 20),
                                   decoration: BoxDecoration(
-                                    color: kPrimaryTeal.withOpacity(0.08),
+                                    color: Colors.white.withOpacity(0.15),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(Icons.mark_email_unread_outlined,
-                                      color: kPrimaryTeal, size: 34),
+                                      color: Colors.white, size: 34),
                                 ),
                                 const Text(
                                   'Verify Your Email',
                                   style: TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w800,
-                                    color: Color(0xFF062B36),
+                                    color: Colors.white,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -475,7 +535,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   'A verification link has been sent to your email. Please verify it to continue.',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Color(0xFF64748B),
+                                    color: Colors.white70,
                                     height: 1.5,
                                   ),
                                 ),
@@ -604,7 +664,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           final auth = AuthService();
           await auth.createUserProfile(_pendingUid!, _pendingProfile!);
         }
-        SnackBarHelper.showSuccess(context, 'Email verified — welcome!');
+        SnackBarHelper.showSuccess(context, 'Email verified â€” welcome!');
         Navigator.pushNamedAndRemoveUntil(
             context, '/main', (route) => false);
       } else {

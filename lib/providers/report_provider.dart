@@ -18,14 +18,12 @@ class ReportProvider extends ChangeNotifier {
   int get resolvedCount =>
       _reports.where((r) => r.status == ReportStatus.resolved).length;
 
-  // ── Bootstrap ─────────────────────────────────────────────────────────────
   Future<void> load() async {
     if (_loaded) return;
     _loaded = true;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getStringList('reports');
     if (raw == null || raw.isEmpty) {
-      // No persisted reports — start with an empty list
       _reports = [];
     } else {
       _reports = raw.map((s) {
@@ -39,21 +37,18 @@ class ReportProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Persist ────────────────────────────────────────────────────────────────
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = _reports.map((r) => jsonEncode(r.toJson())).toList();
     await prefs.setStringList('reports', raw);
   }
 
-  // ── Create ─────────────────────────────────────────────────────────────────
   Future<void> addReport(Report report) async {
     _reports.insert(0, report);
     notifyListeners();
     await _save();
   }
 
-  // ── Update status (simulate AI pipeline) ──────────────────────────────────
   Future<void> advanceStatus(String id) async {
     final idx = _reports.indexWhere((r) => r.id == id);
     if (idx == -1) return;
@@ -74,7 +69,6 @@ class ReportProvider extends ChangeNotifier {
     notifyListeners();
     await _save();
 
-    // ── Dual-write: update Firestore report + notify citizen ─────────────────
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final newStatusLabel = _statusLabel(next);
     try {
@@ -101,7 +95,6 @@ class ReportProvider extends ChangeNotifier {
     }
   }
 
-  // ── Add comment ───────────────────────────────────────────────────────────
   Future<void> addComment(String id, String message) async {
     final idx = _reports.indexWhere((r) => r.id == id);
     if (idx == -1) return;
@@ -116,14 +109,12 @@ class ReportProvider extends ChangeNotifier {
     await _save();
   }
 
-  // ── Delete ────────────────────────────────────────────────────────────────
   Future<void> deleteReport(String id) async {
     _reports.removeWhere((r) => r.id == id);
     notifyListeners();
     await _save();
   }
 
-  // ── Get single ────────────────────────────────────────────────────────────
   Report? getById(String id) {
     try {
       return _reports.firstWhere((r) => r.id == id);

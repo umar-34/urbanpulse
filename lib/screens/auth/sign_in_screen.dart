@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'auth_theme.dart';
 import '../../utils/snackbar_helper.dart';
-// use named route for navigation to avoid circular imports
 import 'sign_up_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -31,16 +30,14 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Full gradient background
       body: Container(
         decoration: const BoxDecoration(gradient: kThemeGradient),
         child: SafeArea(
           child: Column(
             children: [
-              // ── Slim AppBar row ─────────────────────────────────────────
+              // Slim AppBar row
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: Row(
                   children: [
                     IconButton(
@@ -62,14 +59,12 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
               ),
 
-              // ── Scrollable content ───────────────────────────────────────
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
                   child: Center(
                     child: Column(
                       children: [
-                        // Tagline
                         const SizedBox(height: 8),
                         const Text(
                           'Sign in to continue reporting\nurban issues in your city',
@@ -82,21 +77,8 @@ class _SignInScreenState extends State<SignInScreen> {
                         ),
                         const SizedBox(height: 28),
 
-                        // ── White card ──────────────────────────────────────
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(28),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.15),
-                                blurRadius: 32,
-                                offset: const Offset(0, 12),
-                              ),
-                            ],
-                          ),
+                        // ── White card ────
+                        GlassAuthCard(
                           child: Form(
                             key: _formKey,
                             child: Column(
@@ -108,7 +90,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                   style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.w800,
-                                    color: Color(0xFF062B36),
+                                    color: Colors.white,
                                     letterSpacing: -0.5,
                                   ),
                                 ),
@@ -117,39 +99,38 @@ class _SignInScreenState extends State<SignInScreen> {
                                   'Enter your credentials to access your account',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Color(0xFF94A3B8),
+                                    color: Colors.white70,
                                   ),
                                 ),
                                 const SizedBox(height: 24),
 
-                                // Email field
                                 TextFormField(
                                   controller: _emailController,
+                                  style: const TextStyle(color: Colors.white),
                                   keyboardType: TextInputType.emailAddress,
                                   decoration: authInputDecoration(
                                     'Email Address',
                                     prefixIcon: const Icon(
                                       Icons.email_outlined,
-                                      color: kPrimaryTeal,
+                                      color: Colors.white70,
                                       size: 20,
                                     ),
                                   ),
-                                  validator: (v) =>
-                                      (v == null || v.isEmpty)
-                                          ? 'Please enter your email'
-                                          : null,
+                                  validator: (v) => (v == null || v.isEmpty)
+                                      ? 'Please enter your email'
+                                      : null,
                                 ),
                                 const SizedBox(height: 14),
 
-                                // Password field
                                 TextFormField(
                                   controller: _passwordController,
+                                  style: const TextStyle(color: Colors.white),
                                   obscureText: _obscure,
                                   decoration: authInputDecoration(
                                     'Password',
                                     prefixIcon: const Icon(
                                       Icons.lock_outlined,
-                                      color: kPrimaryTeal,
+                                      color: Colors.white70,
                                       size: 20,
                                     ),
                                     suffixIcon: IconButton(
@@ -157,21 +138,20 @@ class _SignInScreenState extends State<SignInScreen> {
                                         _obscure
                                             ? Icons.visibility_off_outlined
                                             : Icons.visibility_outlined,
-                                        color: Colors.grey.shade500,
+                                        color: Colors.white70,
                                         size: 20,
                                       ),
                                       onPressed: () =>
                                           setState(() => _obscure = !_obscure),
                                     ),
                                   ),
-                                  validator: (v) =>
-                                      (v == null || v.isEmpty)
-                                          ? 'Please enter your password'
-                                          : null,
+                                  validator: (v) => (v == null || v.isEmpty)
+                                      ? 'Please enter your password'
+                                      : null,
                                 ),
                                 const SizedBox(height: 24),
 
-                                // Login button — gradient
+                                // Login button â€” gradient
                                 SizedBox(
                                   width: double.infinity,
                                   child: GestureDetector(
@@ -188,8 +168,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                                 ],
                                               )
                                             : kThemeGradient,
-                                        borderRadius:
-                                            BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(12),
                                         boxShadow: _isLoading
                                             ? []
                                             : [
@@ -197,8 +176,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                                   color: kPrimaryTeal
                                                       .withValues(alpha: 0.4),
                                                   blurRadius: 12,
-                                                  offset:
-                                                      const Offset(0, 5),
+                                                  offset: const Offset(0, 5),
                                                 ),
                                               ],
                                       ),
@@ -206,8 +184,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                           ? const SizedBox(
                                               width: 22,
                                               height: 22,
-                                              child:
-                                                  CircularProgressIndicator(
+                                              child: CircularProgressIndicator(
                                                 strokeWidth: 2.5,
                                                 color: Colors.white,
                                               ),
@@ -226,7 +203,6 @@ class _SignInScreenState extends State<SignInScreen> {
 
                                 const SizedBox(height: 24),
 
-                                // OR divider
                                 Row(children: [
                                   Expanded(
                                       child: Divider(
@@ -258,7 +234,8 @@ class _SignInScreenState extends State<SignInScreen> {
                                   style: googleButtonStyle(),
                                   onPressed: _isLoading
                                       ? null
-                                      : () => AuthService().signInWithGoogle(context),
+                                      : () => AuthService()
+                                          .signInWithGoogle(context),
                                   child: const Text(
                                     'Continue with Google',
                                     style: TextStyle(
@@ -273,7 +250,6 @@ class _SignInScreenState extends State<SignInScreen> {
                           ),
                         ),
 
-                        // ── Sign Up link ──────────────────────────────────
                         const SizedBox(height: 28),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -326,7 +302,6 @@ class _SignInScreenState extends State<SignInScreen> {
 
       final user = cred.user;
 
-      // Guard after first async gap
       if (!mounted) return;
 
       if (user == null) {
@@ -335,40 +310,40 @@ class _SignInScreenState extends State<SignInScreen> {
         return;
       }
 
-      // Check email verification
       if (!user.emailVerified) {
-        SnackBarHelper.showInfo(context, 'Please verify your email before logging in.');
+        SnackBarHelper.showInfo(
+            context, 'Please verify your email before logging in.');
         await FirebaseAuth.instance.signOut();
         return;
       }
 
-      // Check Firestore document exists
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .get();
 
-      // Guard after second async gap
       if (!mounted) return;
 
       if (!doc.exists) {
-        SnackBarHelper.showError(context, "Account doesn't exist, please sign up first.");
+        SnackBarHelper.showError(
+            context, "Account doesn't exist, please sign up first.");
         await FirebaseAuth.instance.signOut();
         return;
       }
 
-      // All good — navigate to main wrapper
-      Navigator.pushNamedAndRemoveUntil(
-          context, '/main', (route) => false);
+      Navigator.pushNamedAndRemoveUntil(context, '/main', (route) => false);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
+      if (e.code == 'user-not-found' ||
+          e.code == 'wrong-password' ||
+          e.code == 'invalid-credential') {
         SnackBarHelper.showError(context, 'Incorrect email or password');
       } else {
         SnackBarHelper.showError(context, e.message ?? 'Sign in failed.');
       }
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, 'Sign in failed. Please try again.');
+      if (mounted)
+        SnackBarHelper.showError(context, 'Sign in failed. Please try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
